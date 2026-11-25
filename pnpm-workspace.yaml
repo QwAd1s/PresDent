@@ -1,0 +1,11 @@
+packages:
+  - '.'
+# Плоская раскладка node_modules (как у npm): pnpm создаёт настоящие папки,
+# а не junction-ссылки — так сборка одинаково работает на Windows и Linux.
+nodeLinker: hoisted
+shamefullyHoist: true
+verifyDepsBeforeRun: false
+# esbuild несёт готовый бинарник в optional-зависимости @esbuild/*,
+# поэтому его postinstall не нужен.
+ignoredBuiltDependencies:
+  - esbuild
