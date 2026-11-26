@@ -2,7 +2,6 @@ import express from 'express'
 import { randomBytes } from 'node:crypto'
 import type { Appointment, Lead, LeadsResponse, LeadStatus, Stats, StoredUser, UserRole } from '../shared/types'
 import { channelStates, series as seedSeries } from '../shared/fixtures'
-import { assistantReply, type AssistantPending } from '../shared/assistant'
 import { availableSlots, dateWithWeekday } from '../shared/slots'
 import { SERVICE_DURATION } from '../shared/services'
 import { auditRequest, recordAudit } from './audit'
@@ -830,34 +829,6 @@ router.post('/appointments', anyRole, (req, res) => {
     `${patientName} · ${service} · ${startDate.toLocaleString('ru-RU')}`,
   )
   res.status(201).json(appointment)
-})
-
-/**
- * ИИ-админ. Локальный движок: понимает фразу, смотрит расписание и готовит запись.
- * Внешняя LLM сюда подключается позже — интерфейс запроса/ответа уже готов.
- */
-router.post('/assistant', staffOnly, (req, res) => {
-  const db = getDb()
-  const { text, page, pending } = req.body ?? {}
-
-  if (!text || typeof text !== 'string') {
-    res.status(400).json({ error: 'Пустой запрос' })
-    return
-  }
-
-  const reply = assistantReply({
-    text,
-    page,
-    pending: pending as AssistantPending | undefined,
-    data: {
-      doctors: db.doctors,
-      appointments: db.appointments,
-      patients: db.patients,
-      leads: db.leads,
-    },
-  })
-
-  res.json(reply)
 })
 
 // ─── Каналы и вебхуки ───────────────────────────────────────────────────────

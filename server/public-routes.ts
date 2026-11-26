@@ -2,6 +2,7 @@ import express from 'express'
 import type { Appointment, Lead, Patient } from '../shared/types'
 import { SERVICES, findService } from '../shared/services'
 import { availableSlots, dateWithWeekday } from '../shared/slots'
+import { patientAssistantReply } from '../shared/patient-assistant'
 import { addEvent, getDb, newId, saveDb } from './store'
 import { recordAudit } from './audit'
 import { broadcast } from './realtime'
@@ -91,6 +92,39 @@ publicRouter.get('/slots', (req, res) => {
     workingDay: result.workingDay,
     dayLabel: dateWithWeekday(parsed.toISOString()),
   })
+})
+
+/** ИИ-помощник пациента: только открытые данные, без заявок и истории. */
+const botHits = new Map<string, number[]>()
+
+publicRouter.post('/assistant', (req, res) => {
+  const ip = req.ip ?? 'unknown'
+  const now = Date.now()
+  const hits = (botHits.get(ip) ?? []).filter((at) => now - at < 60 * 60_000)
+  if (hits.length >= 80) {
+    res.status(429).json({ error: 'Слишком много вопросов подряд. Позвоните нам — ответим голосом.' })
+    return
+  }
+  hits.push(now)
+  botHits.set(ip, hits)
+
+  const text = String(req.body?.text ?? '').trim()
+  if (!text) {
+    res.status(400).json({ error: 'Задайте вопрос' })
+    return
+  }
+  if (text.length > 600) {
+    res.status(400).json({ error: 'Слишком длинный вопрос — напишите короче' })
+    return
+  }
+
+  const db = getDb()
+  const reply = patientAssistantReply({
+    text,
+    data: { settings: db.settings, doctors: db.doctors, appointments: db.appointments },
+  })
+
+  res.json(reply)
 })
 
 /** Онлайн-запись: занимаем слот, создаём пациента (если новый) и заявку администратору. */

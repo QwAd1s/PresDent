@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Service } from '../../shared/services'
 import { findService, formatPrice } from '../../shared/services'
@@ -12,7 +12,10 @@ import {
   type PublicSlot,
 } from '../lib/public-api'
 import { formatTime, initials } from '../lib/format'
+import { PatientAssistant, type BookingPrefill } from '../components/PatientAssistant'
 import './public.css'
+
+type Prefill = BookingPrefill & { token: number }
 
 const WEEKDAY_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
 
@@ -28,7 +31,7 @@ const workingDaysLabel = (days: number[]) => {
 export default function PublicSite() {
   const [clinic, setClinic] = useState<PublicClinic | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [presetService, setPresetService] = useState<string | null>(null)
+  const [prefill, setPrefill] = useState<Prefill | null>(null)
 
   const load = useCallback(() => {
     setLoadError(null)
@@ -39,9 +42,18 @@ export default function PublicSite() {
 
   useEffect(load, [load])
 
-  const chooseService = (service: Service) => {
-    setPresetService(service.title)
+  const scrollToBooking = () => {
     document.getElementById('booking')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  const chooseService = (service: Service) => {
+    setPrefill({ service: service.title, token: Date.now() })
+    scrollToBooking()
+  }
+
+  const handleBotBook = (next: BookingPrefill) => {
+    setPrefill({ ...next, token: Date.now() })
+    scrollToBooking()
   }
 
   return (
@@ -244,8 +256,8 @@ export default function PublicSite() {
             {clinic && (
               <BookingForm
                 clinic={clinic}
-                presetService={presetService}
-                onClearPreset={() => setPresetService(null)}
+                prefill={prefill}
+                onConsumed={() => setPrefill(null)}
               />
             )}
           </div>
@@ -272,6 +284,8 @@ export default function PublicSite() {
           </div>
         </div>
       </footer>
+
+      <PatientAssistant onBook={handleBotBook} />
     </div>
   )
 }
@@ -280,14 +294,14 @@ export default function PublicSite() {
 
 function BookingForm({
   clinic,
-  presetService,
-  onClearPreset,
+  prefill,
+  onConsumed,
 }: {
   clinic: PublicClinic
-  presetService: string | null
-  onClearPreset: () => void
+  prefill: Prefill | null
+  onConsumed: () => void
 }) {
-  const [service, setService] = useState(presetService ?? clinic.services[0]?.title ?? 'Консультация')
+  const [service, setService] = useState(clinic.services[0]?.title ?? 'Консультация')
   const [doctorId, setDoctorId] = useState('')
   const [date, setDate] = useState(toDateInput(new Date()))
   const [slots, setSlots] = useState<PublicSlot[]>([])
@@ -300,6 +314,7 @@ function BookingForm({
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<BookingResult | null>(null)
+  const desiredStart = useRef<string | null>(null)
 
   const doctor = useMemo(
     () => clinic.doctors.find((item) => item.id === doctorId) ?? null,
@@ -317,13 +332,17 @@ function BookingForm({
   )
 
   useEffect(() => {
-    if (presetService) {
-      setService(presetService)
-      pickDoctorFor(presetService)
-      onClearPreset()
-    }
+    if (!prefill) return
+
+    if (prefill.service) setService(prefill.service)
+    if (prefill.doctorId) setDoctorId(prefill.doctorId)
+    else if (prefill.service) pickDoctorFor(prefill.service)
+    if (prefill.date) setDate(prefill.date)
+
+    desiredStart.current = prefill.start ?? null
+    onConsumed()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [presetService])
+  }, [prefill?.token])
 
   useEffect(() => {
     if (!doctorId) pickDoctorFor(service)
@@ -342,7 +361,13 @@ function BookingForm({
           if (!alive) return
           setSlots(payload.items)
           setDayInfo({ workingDay: payload.workingDay, dayLabel: payload.dayLabel })
-          setSlot(payload.items[0] ?? null)
+
+          const wanted = desiredStart.current
+          const match = wanted
+            ? payload.items.find((item) => new Date(item.start).getTime() === new Date(wanted).getTime())
+            : null
+          setSlot(match ?? payload.items[0] ?? null)
+          desiredStart.current = null
         })
         .catch(() => {
           if (alive) setSlots([])

@@ -1,4 +1,5 @@
 import type { Service } from '../../shared/services'
+import type { PatientReply } from '../../shared/patient-assistant'
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -68,3 +69,7 @@ export const bookOnline = (input: {
   start: string
   comment?: string
 }) => request<BookingResult>('/api/public/book', { method: 'POST', body: JSON.stringify(input) })
+
+/** Вопрос ИИ-помощнику: сервер отвечает только по открытым данным клиники. */
+export const askPatientAssistant = (text: string) =>
+  request<PatientReply>('/api/public/assistant', { method: 'POST', body: JSON.stringify({ text }) })

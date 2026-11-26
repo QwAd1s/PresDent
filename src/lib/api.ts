@@ -15,7 +15,6 @@ import type {
   UserRole,
 } from '../../shared/types'
 import * as demo from './mock'
-import { assistantReply, type AssistantPending, type AssistantReply } from '../../shared/assistant'
 import type { SlotOffer } from '../../shared/slots'
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
@@ -412,21 +411,7 @@ export async function rescheduleAppointment(
   return demo.rescheduleAppointment(id, start)
 }
 
-// ─── ИИ-админ ───────────────────────────────────────────────────────────────
-
-/** Запрос к ИИ-админу: на сервере — движок из shared/assistant.ts, без API → демо. */
-export async function askAssistant(
-  text: string,
-  page: string,
-  pending?: AssistantPending,
-): Promise<AssistantReply> {
-  const live = await http<AssistantReply>('/api/assistant', {
-    method: 'POST',
-    body: JSON.stringify({ text, page, pending }),
-  })
-
-  return live ?? assistantReply({ text, page, pending, data: demo.getAssistantData() })
-}
+// ─── Запись на приём ────────────────────────────────────────────────────────
 
 /** Запись на приём: 409 от сервера = время заняли, пока мы думали. */
 export async function bookAppointment(input: demo.AppointmentInput): Promise<{

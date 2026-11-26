@@ -81,7 +81,7 @@ export default function Login() {
             </li>
             <li>
               <Icon name="sparkles" size={17} />
-              ИИ-админ подскажет окно и оформит запись
+              ИИ-помощник на сайте подберёт окно и запишет
             </li>
           </ul>
         </div>

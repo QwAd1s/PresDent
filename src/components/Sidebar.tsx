@@ -89,17 +89,6 @@ export function Sidebar({ newLeads, unansweredReviews }: SidebarProps) {
 
         {staff && (
           <>
-            <div className="nav-group-label">Помощник</div>
-            <button
-              className="nav-item"
-              onClick={() => window.dispatchEvent(new Event('assistant:open'))}
-              title="ИИ-админ"
-            >
-              <Icon name="sparkles" size={18} />
-              <span>ИИ-админ</span>
-              <span className="nav-badge hot">AI</span>
-            </button>
-
             <div className="nav-group-label">Публичное</div>
             <a className="nav-item" href="/site" target="_blank" rel="noreferrer" title="Сайт клиники">
               <Icon name="globe" size={18} />

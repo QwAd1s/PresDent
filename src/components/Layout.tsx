@@ -4,8 +4,6 @@ import type { Stats } from '../../shared/types'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { connectRealtime, disconnectRealtime, getReviews, getStats, isDemoMode, subscribe } from '../lib/api'
-import { useAuth } from '../lib/auth'
-import { Assistant } from './Assistant'
 
 export interface LayoutContext {
   stats: Stats | null
@@ -13,7 +11,6 @@ export interface LayoutContext {
 }
 
 export function Layout() {
-  const { can } = useAuth()
   const [stats, setStats] = useState<Stats | null>(null)
   const [unanswered, setUnanswered] = useState(0)
   const [demoMode, setDemoMode] = useState(isDemoMode())
@@ -60,7 +57,6 @@ export function Layout() {
           <Outlet context={{ stats, refreshStats } satisfies LayoutContext} />
         </main>
       </div>
-      {can('owner', 'admin') && <Assistant />}
     </div>
   )
 }

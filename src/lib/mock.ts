@@ -349,14 +349,7 @@ export const countByStatus = () =>
     { new: 0, in_progress: 0, booked: 0, closed: 0, spam: 0 },
   )
 
-// ─── ИИ-админ и запись на приём (демо-режим) ────────────────────────────────
-
-export const getAssistantData = () => ({
-  doctors,
-  appointments,
-  patients,
-  leads,
-})
+// ─── Запись на приём (демо-режим) ───────────────────────────────────────────
 
 export interface AppointmentInput {
   patientName: string
