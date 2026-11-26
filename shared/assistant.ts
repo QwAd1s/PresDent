@@ -1,4 +1,16 @@
 import type { Appointment, Doctor, Lead, Patient } from './types'
+import { SERVICES } from './services'
+import {
+  dateWithWeekday,
+  formatTime,
+  freeSlots,
+  nextWorkingDay,
+  onlyDay,
+  overlaps,
+  sameDay,
+  weekdayNumber,
+  type SlotOffer,
+} from './slots'
 
 /**
  * ИИ-админ: локальный помощник администратора.
@@ -15,17 +27,6 @@ export interface AssistantData {
   appointments: Appointment[]
   patients: Patient[]
   leads: Lead[]
-}
-
-export interface SlotOffer {
-  id: string
-  start: string
-  label: string
-  doctorId: string
-  doctorName: string
-  service: string
-  durationMin: number
-  patientName?: string
 }
 
 export interface BookingAction {
@@ -63,32 +64,16 @@ export interface AssistantRequest {
   pending?: AssistantPending
 }
 
-const SLOT_STEP_MIN = 30
-const MAX_SLOTS = 6
+export type { SlotOffer }
 
-const SERVICE_DURATION: Record<string, number> = {
-  Консультация: 30,
-  'Гигиена и чистка': 60,
-  'Лечение кариеса': 60,
-  Имплантация: 120,
-  Протезирование: 90,
-  Ортодонтия: 60,
-  Эстетика: 90,
-  'Удаление зуба': 60,
-  'Детская стоматология': 45,
-}
+/** Длительность берём из общего справочника услуг. */
+const SERVICE_DURATION: Record<string, number> = Object.fromEntries(
+  SERVICES.map((service) => [service.title, service.durationMin]),
+)
 
-const SERVICE_SPECIALTY: Record<string, RegExp> = {
-  'Гигиена и чистка': /гигиен/,
-  Имплантация: /имплант|хирург/,
-  'Удаление зуба': /имплант|хирург/,
-  Ортодонтия: /ортодонт/,
-  'Детская стоматология': /детск/,
-  Протезирование: /ортопед/,
-  'Лечение кариеса': /терапевт/,
-  Эстетика: /терапевт/,
-  Консультация: /терапевт/,
-}
+const SERVICE_SPECIALTY: Record<string, RegExp> = Object.fromEntries(
+  SERVICES.map((service) => [service.title, new RegExp(service.specialty)]),
+)
 
 const SERVICE_HINTS: Array<[RegExp, string]> = [
   [/чистк|гигиен|налёт|налет|камен/i, 'Гигиена и чистка'],
@@ -180,23 +165,6 @@ const normalize = (value: string) =>
     .replace(/\s+/g, ' ')
     .trim()
 
-const onlyDay = (date: Date) => {
-  const copy = new Date(date)
-  copy.setHours(0, 0, 0, 0)
-  return copy
-}
-
-const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString()
-
-export const formatRuDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
-
-export const weekdayOf = (iso: string) =>
-  new Date(iso).toLocaleDateString('ru-RU', { weekday: 'long' })
-
-/** «27 ноября (пятница)» — без падежных ловушек */
-const dateWithWeekday = (iso: string) => `${formatRuDate(iso)} (${weekdayOf(iso)})`
-
 const stem = (word: string) => (word.length >= 5 ? word.slice(0, word.length - 1) : word)
 
 /** Сравнение с учётом склонений: «Малику» ≈ «Малика», «Тасуеву» ≈ «Тасуева» */
@@ -206,11 +174,6 @@ const sameWord = (a: string, b: string) => {
   if (a.length < 4 || b.length < 4) return false
   return a.startsWith(stem(b)) || b.startsWith(stem(a))
 }
-
-const formatTime = (iso: string) =>
-  new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })
-
-const weekdayNumber = (date: Date) => (date.getDay() === 0 ? 7 : date.getDay())
 
 function parseDate(text: string, now = new Date()): Date | null {
   const t = normalize(text)
@@ -326,69 +289,6 @@ function doctorForService(service: string, doctors: Doctor[]): Doctor | null {
   return doctors.find((doctor) => matcher.test(normalize(doctor.specialty))) ?? doctors[0] ?? null
 }
 
-function overlaps(startA: Date, minutesA: number, startB: Date, minutesB: number) {
-  const endA = startA.getTime() + minutesA * 60_000
-  const endB = startB.getTime() + minutesB * 60_000
-  return startA.getTime() < endB && startB.getTime() < endA
-}
-
-function workingWindow(date: Date): { open: number; close: number } {
-  return date.getDay() === 0 ? { open: 10, close: 18 } : { open: 9, close: 21 }
-}
-
-function freeSlots(
-  doctor: Doctor,
-  date: Date,
-  durationMin: number,
-  data: AssistantData,
-  service: string,
-  patientName?: string,
-): SlotOffer[] {
-  const { open, close } = workingWindow(date)
-  const busy = data.appointments
-    .filter((appointment) => appointment.doctorId === doctor.id && sameDay(new Date(appointment.start), date))
-    .map((appointment) => ({
-      start: new Date(appointment.start),
-      minutes: appointment.durationMin,
-    }))
-
-  const now = new Date()
-  const earliest = new Date(now.getTime() + 60 * 60_000)
-  const offers: SlotOffer[] = []
-
-  for (let minutes = open * 60; minutes + durationMin <= close * 60; minutes += SLOT_STEP_MIN) {
-    if (offers.length >= MAX_SLOTS) break
-
-    const candidate = new Date(date)
-    candidate.setHours(0, minutes, 0, 0)
-
-    if (candidate.getTime() < earliest.getTime()) continue
-    if (busy.some((item) => overlaps(candidate, durationMin, item.start, item.minutes))) continue
-
-    offers.push({
-      id: `${doctor.id}-${candidate.toISOString()}`,
-      start: candidate.toISOString(),
-      label: formatTime(candidate.toISOString()),
-      doctorId: doctor.id,
-      doctorName: doctor.name,
-      service,
-      durationMin,
-      patientName,
-    })
-  }
-
-  return offers
-}
-
-function nextWorkingDay(doctor: Doctor, from: Date): Date {
-  const date = onlyDay(from)
-  for (let shift = 1; shift <= 7; shift += 1) {
-    date.setDate(date.getDate() + 1)
-    if (doctor.workingDays.includes(weekdayNumber(date))) return new Date(date)
-  }
-  return date
-}
-
 function buildSlotsReply(args: {
   doctor: Doctor
   date: Date
@@ -402,7 +302,7 @@ function buildSlotsReply(args: {
 
   if (!offers.length) {
     const next = nextWorkingDay(doctor, date)
-    const nextOffers = freeSlots(doctor, next, durationMin, data, service, patientName)
+    const nextOffers = freeSlots(doctor, next, durationMin, data.appointments, service, patientName)
     return {
       intent: 'slots_empty',
       text:
@@ -483,7 +383,7 @@ export function assistantReply({ text, data, page, pending }: AssistantRequest):
       )
 
       if (taken) {
-        const offers = freeSlots(doctor, onlyDay(slotDate), pending.durationMin, data, pending.service, name)
+        const offers = freeSlots(doctor, onlyDay(slotDate), pending.durationMin, data.appointments, pending.service, name)
         return {
           intent: 'book_busy',
           text:
@@ -573,7 +473,7 @@ export function assistantReply({ text, data, page, pending }: AssistantRequest):
     const date = parseDate(raw) ?? new Date(Date.now() + 86_400_000)
     const doctor = data.doctors.find((item) => item.id === barePatient.doctorId) ?? doctorForService(service, data.doctors)
     if (doctor) {
-      const offers = freeSlots(doctor, date, durationMin, data, service, barePatient.name)
+      const offers = freeSlots(doctor, date, durationMin, data.appointments, service, barePatient.name)
       return buildSlotsReply({ doctor, date, offers, durationMin, data, patientName: barePatient.name, service })
     }
   }
@@ -590,7 +490,7 @@ export function assistantReply({ text, data, page, pending }: AssistantRequest):
       if (!doctor) {
         return { intent: 'book_error', text: 'Не нашёл подходящего врача. Уточните специализацию.', chips: SKILL_CHIPS }
       }
-      const offers = freeSlots(doctor, slotsDate, effectiveDuration, data, effectiveService)
+      const offers = freeSlots(doctor, slotsDate, effectiveDuration, data.appointments, effectiveService)
       return {
         intent: 'book_need_name',
         text:
@@ -613,7 +513,7 @@ export function assistantReply({ text, data, page, pending }: AssistantRequest):
 
     if (!doctor.workingDays.includes(weekdayNumber(date))) {
       const next = nextWorkingDay(doctor, date)
-      const offers = freeSlots(doctor, next, durationMin, data, service, patient.name)
+      const offers = freeSlots(doctor, next, durationMin, data.appointments, service, patient.name)
       return {
         intent: 'book_day_off',
         text:
@@ -654,7 +554,7 @@ export function assistantReply({ text, data, page, pending }: AssistantRequest):
         }
       }
 
-      const offers = freeSlots(doctor, date, durationMin, data, service, patient.name)
+      const offers = freeSlots(doctor, date, durationMin, data.appointments, service, patient.name)
       return {
         intent: 'book_busy',
         text:
@@ -665,7 +565,7 @@ export function assistantReply({ text, data, page, pending }: AssistantRequest):
       }
     }
 
-    const offers = freeSlots(doctor, date, durationMin, data, service, patient.name)
+    const offers = freeSlots(doctor, date, durationMin, data.appointments, service, patient.name)
     return buildSlotsReply({ doctor, date, offers, durationMin, data, patientName: patient.name, service })
   }
 
@@ -696,7 +596,7 @@ export function assistantReply({ text, data, page, pending }: AssistantRequest):
       const busy = data.appointments
         .filter((item) => item.doctorId === doctor.id && sameDay(new Date(item.start), date))
         .sort((a, b) => +new Date(a.start) - +new Date(b.start))
-      const offers = freeSlots(doctor, date, 60, data, 'Консультация', patient?.name)
+      const offers = freeSlots(doctor, date, 60, data.appointments, 'Консультация', patient?.name)
 
       return {
         intent: 'doctor_schedule',
@@ -713,7 +613,7 @@ export function assistantReply({ text, data, page, pending }: AssistantRequest):
     // без конкретного врача — общая картина по дню
     const perDoctor = data.doctors
       .map((item) => {
-        const slots = freeSlots(item, date, 60, data, item.specialty)
+        const slots = freeSlots(item, date, 60, data.appointments, item.specialty)
         return slots.length
           ? { name: item.name, slots: slots.slice(0, 3).map((slot) => slot.label) }
           : null

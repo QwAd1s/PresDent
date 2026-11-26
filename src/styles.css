@@ -715,6 +715,14 @@ a {
 .stack {
   display: grid;
   gap: 16px;
+  /* карточки не должны растягиваться на всю высоту колонки */
+  align-content: start;
+  grid-auto-rows: min-content;
+}
+
+.stack > .card {
+  align-self: start;
+  height: auto;
 }
 
 /* ─── Бейджи, статусы, каналы ────────────────────────────────────────────── */
@@ -1032,6 +1040,54 @@ textarea.input {
 }
 
 /* ─── Каналы (карточка источника) ────────────────────────────────────────── */
+
+.source-list {
+  display: grid;
+  gap: 14px;
+  padding-top: 12px;
+}
+
+.source-item {
+  display: grid;
+  gap: 6px;
+}
+
+.source-item-top {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.source-name {
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.source-count {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.source-meter {
+  height: 6px;
+  border-radius: 99px;
+  background: #eef3f5;
+  overflow: hidden;
+}
+
+.source-meter span {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s var(--ease);
+}
+
+.source-hint {
+  font-size: 11px;
+  color: var(--ink-3);
+}
 
 .source-row {
   display: flex;

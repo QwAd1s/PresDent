@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { Lead, LeadStatus } from '../../shared/types'
-import { CHANNEL_LABEL, SERVICE_LIST, STATUS_LABEL } from '../../shared/types'
+import { CHANNEL_LABEL, STATUS_LABEL } from '../../shared/types'
+import { SERVICES, findService, formatPrice } from '../../shared/services'
 import { updateLead, sendMessage } from '../lib/api'
 import { formatDate, formatTime, relativeTime } from '../lib/format'
 import { Icon } from './Icon'
@@ -29,6 +31,7 @@ interface LeadDrawerProps {
 }
 
 export function LeadDrawer({ lead, onClose, onChanged }: LeadDrawerProps) {
+  const navigate = useNavigate()
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState(lead.note ?? '')
@@ -118,6 +121,11 @@ export function LeadDrawer({ lead, onClose, onChanged }: LeadDrawerProps) {
               <Icon name="inbox" size={13} />
               {lead.service ?? 'Без услуги'}
             </span>
+            {findService(lead.service) && (
+              <span className="pill" style={{ color: 'var(--brand-dark)', background: 'var(--brand-soft)', borderColor: '#cdeee2' }}>
+                {formatPrice(findService(lead.service)!.price)} · {findService(lead.service)!.durationMin} мин
+              </span>
+            )}
             {lead.priority === 'high' && (
               <span className="pill" style={{ color: '#b8373c', background: 'var(--danger-soft)', borderColor: '#f6d3d4' }}>
                 <Icon name="alert" size={13} />
@@ -153,12 +161,12 @@ export function LeadDrawer({ lead, onClose, onChanged }: LeadDrawerProps) {
                   if (updated) onChanged(updated)
                 }}
               >
-                {(lead.service && !SERVICE_LIST.includes(lead.service)
-                  ? [lead.service, ...SERVICE_LIST]
-                  : SERVICE_LIST
+                {(lead.service && !findService(lead.service)
+                  ? [{ title: lead.service }, ...SERVICES]
+                  : SERVICES
                 ).map((service) => (
-                  <option key={service} value={service}>
-                    {service}
+                  <option key={service.title} value={service.title}>
+                    {service.title}
                   </option>
                 ))}
               </select>
@@ -213,9 +221,20 @@ export function LeadDrawer({ lead, onClose, onChanged }: LeadDrawerProps) {
           />
 
           <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-            <button className="btn btn-soft btn-sm" onClick={() => void changeStatus('booked')}>
+            <button
+              className="btn btn-soft btn-sm"
+              onClick={() => {
+                const query = new URLSearchParams({
+                  book: '1',
+                  name: lead.name,
+                  phone: lead.phone ?? '',
+                  service: lead.service ?? 'Консультация',
+                })
+                navigate(`/schedule?${query.toString()}`)
+              }}
+            >
               <Icon name="calendar" size={14} />
-              Записать
+              Записать на приём
             </button>
             <button className="btn btn-ghost btn-sm" onClick={() => void changeStatus('closed')}>
               <Icon name="check" size={14} />

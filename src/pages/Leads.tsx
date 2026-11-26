@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import type { Channel, Lead, LeadsResponse, LeadStatus } from '../../shared/types'
 import { CHANNEL_LABEL, STATUS_LABEL } from '../../shared/types'
 import { createLead, getLeads, subscribe } from '../lib/api'
+import { SERVICES, formatPrice } from '../../shared/services'
 import { relativeTime } from '../lib/format'
 import { Icon } from '../components/Icon'
 import { Avatar, ChannelIcon, EmptyState, Field, Modal, SkeletonRows, StatusBadge } from '../components/ui'
@@ -333,13 +334,11 @@ function CreateLeadModal({
         </Field>
         <Field label="Услуга">
           <select className="select" value={service} onChange={(event) => setService(event.target.value)}>
-            {['Консультация', 'Гигиена и чистка', 'Лечение кариеса', 'Имплантация', 'Протезирование', 'Ортодонтия', 'Эстетика', 'Удаление зуба', 'Детская стоматология'].map(
-              (item) => (
-                <option key={item} value={item}>
-                  {item}
-                </option>
-              ),
-            )}
+            {SERVICES.map((item) => (
+              <option key={item.id} value={item.title}>
+                {item.title} — {formatPrice(item.price)}
+              </option>
+            ))}
           </select>
         </Field>
         <Field label="Канал">

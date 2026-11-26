@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { ROLE_LABEL } from '../../shared/types'
+import { useAuth } from '../lib/auth'
 import { Icon } from './Icon'
 import { Avatar } from './ui'
 
@@ -12,11 +14,14 @@ export const PAGE_TITLES: Record<string, string> = {
   '/reviews': 'Отзывы',
   '/channels': 'Каналы и интеграции',
   '/settings': 'Настройки',
+  '/audit': 'Журнал действий',
+  '/reminders': 'Напоминания',
 }
 
 export function Topbar({ demoMode, newLeads }: { demoMode: boolean; newLeads: number }) {
   const location = useLocation()
   const navigate = useNavigate()
+  const { user } = useAuth()
   const inputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
 
@@ -71,10 +76,12 @@ export function Topbar({ demoMode, newLeads }: { demoMode: boolean; newLeads: nu
       </button>
 
       <div className="avatar-top">
-        <Avatar name="Мадина Ибрагимова" size={34} color="#0E9E7B" />
+        <Avatar name={user?.name ?? 'Гость'} size={34} color="#0E9E7B" />
         <div style={{ lineHeight: 1.25 }}>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>Мадина Ибрагимова</div>
-          <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Администратор</div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>{user?.name ?? 'Гость'}</div>
+          <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>
+            {user ? ROLE_LABEL[user.role] : 'не авторизован'}
+          </div>
         </div>
       </div>
     </header>

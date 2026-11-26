@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import type { Doctor, Lead, Stats } from '../../shared/types'
 import { CHANNEL_LABEL } from '../../shared/types'
 import { getDoctors, getLeads, getStats, subscribe, connectRealtime } from '../lib/api'
+import { useAuth } from '../lib/auth'
 import { initials, relativeTime } from '../lib/format'
 import { Icon, type IconName } from '../components/Icon'
 import { ChannelIcon, ChannelTag, SkeletonRows, Stars, StatusBadge, Avatar } from '../components/ui'
@@ -63,6 +64,7 @@ function Kpi({ label, value, unit, delta, deltaSuffix = '%', invert, icon, color
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [stats, setStats] = useState<Stats | null>(null)
   const [recent, setRecent] = useState<Lead[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
@@ -98,11 +100,16 @@ export default function Dashboard() {
   const today = new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })
   const totalChannel = stats?.byChannel.reduce((sum, item) => sum + item.count, 0) || 1
 
+  if (user?.role === 'doctor') return <Navigate to="/schedule" replace />
+
+  const nameParts = (user?.name ?? 'Мадина').split(' ')
+  const firstName = nameParts[0]
+
   return (
     <>
       <div className="page-head">
         <div>
-          <h1 className="page-title">Добрый день, Мадина</h1>
+          <h1 className="page-title">Добрый день, {firstName}</h1>
           <div className="page-sub">
             {today} · {stats ? `${stats.newLeads} новых обращений сегодня` : 'загружаем данные…'}
           </div>
@@ -255,33 +262,28 @@ export default function Dashboard() {
             <div className="card-head">
               <div>
                 <div className="card-title">Источники заявок</div>
-                <div className="card-sub">Распределение за всё время</div>
+                <div className="card-sub">
+                  Всего {stats ? stats.totalLeads : '—'} обращений за всё время
+                </div>
               </div>
             </div>
-            <div className="card-body" style={{ paddingTop: 6 }}>
+            <div className="card-body source-list">
               {stats?.byChannel
                 .slice()
                 .sort((a, b) => b.count - a.count)
                 .map((item) => {
                   const share = Math.round((item.count / totalChannel) * 100)
                   return (
-                    <div className="source-row" key={item.channel}>
-                      <ChannelIcon channel={item.channel} size={26} />
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 550 }}>{CHANNEL_LABEL[item.channel]}</div>
-                        <div className="muted" style={{ fontSize: 11.5 }}>
-                          {share}% обращений
-                        </div>
+                    <div className="source-item" key={item.channel}>
+                      <div className="source-item-top">
+                        <ChannelIcon channel={item.channel} size={22} />
+                        <span className="source-name">{CHANNEL_LABEL[item.channel]}</span>
+                        <span className="source-count">{item.count}</span>
                       </div>
-                      <div className="source-bar">
-                        {item.count}
-                        <span className="source-track">
-                          <span
-                            className="source-fill"
-                            style={{ width: `${share}%`, background: CHANNEL_COLOR[item.channel] }}
-                          />
-                        </span>
-                      </div>
+                      <span className="source-meter">
+                        <span style={{ width: `${Math.max(share, 3)}%`, background: CHANNEL_COLOR[item.channel] }} />
+                      </span>
+                      <span className="source-hint">{share}% обращений</span>
                     </div>
                   )
                 })}

@@ -21,6 +21,8 @@ import {
   series as seedSeries,
 } from '../../shared/fixtures'
 import { formatRuPhone } from './phone'
+import { availableSlots } from '../../shared/slots'
+import { SERVICE_DURATION } from '../../shared/services'
 
 /**
  * Демо-хранилище: полная копия поведения API в памяти браузера.
@@ -368,8 +370,7 @@ export interface AppointmentInput {
 
 export function addAppointment(
   input: AppointmentInput,
-): { ok: true; appointment: Appointment } | { ok: false; error: string } {
-  const startDate = new Date(input.start)
+): { ok: true; appointment: Appointment } | { ok: false; error: string } {  const startDate = new Date(input.start)
   const duration = input.durationMin || 30
 
   const conflict = appointments.find((appointment) => {
@@ -403,5 +404,61 @@ export function addAppointment(
     lead.updatedAt = new Date().toISOString()
   }
 
+  return { ok: true, appointment }
+}
+
+// ─── Слоты и управление записями (демо-режим) ───────────────────────────────
+
+export function getSlots(doctorId: string, date: string, service: string) {
+  const doctor = doctors.find((item) => item.id === doctorId)
+  const parsed = new Date(`${date}T00:00:00`)
+
+  if (!doctor || Number.isNaN(parsed.getTime())) {
+    return { items: [], workingDay: false, dayLabel: '—' }
+  }
+
+  const duration = SERVICE_DURATION[service] ?? 60
+  const result = availableSlots(doctor, parsed, appointments, duration, service, 16)
+
+  return {
+    items: result.slots,
+    workingDay: result.workingDay,
+    dayLabel: parsed.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }),
+  }
+}
+
+export function updateAppointment(
+  id: string,
+  patch: { status?: Appointment['status']; note?: string; cancelledReason?: string },
+): { ok: boolean; appointment?: Appointment; error?: string } {
+  const appointment = appointments.find((item) => item.id === id)
+  if (!appointment) return { ok: false, error: 'Запись не найдена' }
+
+  Object.assign(appointment, patch)
+  return { ok: true, appointment }
+}
+
+export function rescheduleAppointment(
+  id: string,
+  start: string,
+): { ok: boolean; appointment?: Appointment; error?: string } {
+  const appointment = appointments.find((item) => item.id === id)
+  if (!appointment) return { ok: false, error: 'Запись не найдена' }
+
+  const target = new Date(start)
+  if (Number.isNaN(target.getTime())) return { ok: false, error: 'Некорректное время' }
+
+  const end = target.getTime() + appointment.durationMin * 60_000
+  const conflict = appointments.find((other) => {
+    if (other.id === appointment.id || other.doctorId !== appointment.doctorId) return false
+    if (other.status === 'cancelled') return false
+    const otherStart = new Date(other.start).getTime()
+    return target.getTime() < otherStart + other.durationMin * 60_000 && otherStart < end
+  })
+
+  if (conflict) return { ok: false, error: 'Это время уже занято' }
+
+  appointment.start = target.toISOString()
+  appointment.status = 'confirmed'
   return { ok: true, appointment }
 }

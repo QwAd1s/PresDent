@@ -1,4 +1,6 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { ROLE_LABEL } from '../../shared/types'
+import { useAuth } from '../lib/auth'
 import { Icon, type IconName } from './Icon'
 import { Avatar } from './ui'
 
@@ -17,19 +19,31 @@ interface SidebarProps {
 }
 
 export function Sidebar({ newLeads, unansweredReviews }: SidebarProps) {
+  const { user, logout, can } = useAuth()
+  const navigate = useNavigate()
+  const staff = can('owner', 'admin')
+
   const mainNav: NavItem[] = [
-    { to: '/', label: 'Главная', icon: 'home', end: true },
-    { to: '/leads', label: 'Заявки', icon: 'inbox', badge: newLeads || undefined, hot: true },
+    ...(staff
+      ? ([
+          { to: '/', label: 'Главная', icon: 'home', end: true },
+          { to: '/leads', label: 'Заявки', icon: 'inbox', badge: newLeads || undefined, hot: true },
+        ] as NavItem[])
+      : []),
     { to: '/patients', label: 'База пациентов', icon: 'users' },
     { to: '/doctors', label: 'Врачи', icon: 'doctor' },
     { to: '/schedule', label: 'Расписание', icon: 'calendar' },
     { to: '/reviews', label: 'Отзывы', icon: 'star', badge: unansweredReviews || undefined },
   ]
 
-  const extraNav: NavItem[] = [
-    { to: '/channels', label: 'Каналы и интеграции', icon: 'plug' },
-    { to: '/settings', label: 'Настройки', icon: 'settings' },
-  ]
+  const extraNav: NavItem[] = staff
+    ? [
+        { to: '/channels', label: 'Каналы и интеграции', icon: 'plug' },
+        { to: '/reminders', label: 'Напоминания', icon: 'bell' },
+        { to: '/audit', label: 'Журнал действий', icon: 'clock' },
+        { to: '/settings', label: 'Настройки', icon: 'settings' },
+      ]
+    : []
 
   const renderItem = (item: NavItem) => (
     <NavLink
@@ -66,43 +80,66 @@ export function Sidebar({ newLeads, unansweredReviews }: SidebarProps) {
         <div className="nav-group-label">Клиника</div>
         {mainNav.map(renderItem)}
 
-        <div className="nav-group-label">Интеграции</div>
-        {extraNav.map(renderItem)}
+        {extraNav.length > 0 && (
+          <>
+            <div className="nav-group-label">Интеграции</div>
+            {extraNav.map(renderItem)}
+          </>
+        )}
 
-        <div className="nav-group-label">Помощник</div>
-        <button
-          className="nav-item"
-          onClick={() => window.dispatchEvent(new Event('assistant:open'))}
-          title="ИИ-админ"
-        >
-          <Icon name="sparkles" size={18} />
-          <span>ИИ-админ</span>
-          <span className="nav-badge hot">AI</span>
-        </button>
+        {staff && (
+          <>
+            <div className="nav-group-label">Помощник</div>
+            <button
+              className="nav-item"
+              onClick={() => window.dispatchEvent(new Event('assistant:open'))}
+              title="ИИ-админ"
+            >
+              <Icon name="sparkles" size={18} />
+              <span>ИИ-админ</span>
+              <span className="nav-badge hot">AI</span>
+            </button>
 
-        <div className="nav-group-label">Состояние каналов</div>
-        <div className="channel-mini">
-          <span className="dot live" />
-          WhatsApp · онлайн
-        </div>
-        <div className="channel-mini">
-          <span className="dot live" />
-          Instagram · онлайн
-        </div>
-        <div className="channel-mini">
-          <span className="dot demo" />
-          Сайт · форма
-        </div>
+            <div className="nav-group-label">Публичное</div>
+            <a className="nav-item" href="/site" target="_blank" rel="noreferrer" title="Сайт клиники">
+              <Icon name="globe" size={18} />
+              <span>Сайт клиники</span>
+            </a>
+
+            <div className="nav-group-label">Состояние каналов</div>
+            <div className="channel-mini">
+              <span className="dot live" />
+              WhatsApp · онлайн
+            </div>
+            <div className="channel-mini">
+              <span className="dot live" />
+              Instagram · онлайн
+            </div>
+            <div className="channel-mini">
+              <span className="dot demo" />
+              Сайт · форма
+            </div>
+          </>
+        )}
       </nav>
 
       <div className="sidebar-footer">
         <div className="user-card">
-          <Avatar name="Мадина Ибрагимова" size={32} color="#14b98f" />
+          <Avatar name={user?.name ?? 'Гость'} size={32} color="#14b98f" />
           <div style={{ minWidth: 0 }}>
-            <div className="name">Мадина Ибрагимова</div>
-            <div className="role">Администратор</div>
+            <div className="name">{user?.name ?? 'Гость'}</div>
+            <div className="role">{user ? ROLE_LABEL[user.role] : '—'}</div>
           </div>
-          <button className="icon-btn" style={{ marginLeft: 'auto', width: 30, height: 30, color: '#8fa8b1' }} aria-label="Выйти">
+          <button
+            className="icon-btn"
+            style={{ marginLeft: 'auto', width: 30, height: 30, color: '#8fa8b1' }}
+            title="Выйти"
+            aria-label="Выйти из аккаунта"
+            onClick={async () => {
+              await logout()
+              navigate('/login', { replace: true })
+            }}
+          >
             <Icon name="logout" size={16} />
           </button>
         </div>

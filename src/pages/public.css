@@ -1,0 +1,794 @@
+/* Публичный сайт клиники */
+
+.site {
+  --site-bg: #fbfdfc;
+  --site-ink: #08181f;
+  --site-ink-2: #465f69;
+  --site-line: #e3ecee;
+  --site-brand: #0e9e7b;
+  --site-brand-dark: #076b53;
+  min-height: 100vh;
+  background: var(--site-bg);
+  color: var(--site-ink);
+  scroll-behavior: smooth;
+}
+
+.site-shell {
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 28px;
+}
+
+/* ─── Шапка ──────────────────────────────────────────────────────────────── */
+
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: rgba(251, 253, 252, 0.86);
+  backdrop-filter: saturate(180%) blur(14px);
+  border-bottom: 1px solid var(--site-line);
+}
+
+.site-header-inner {
+  height: 72px;
+  display: flex;
+  align-items: center;
+  gap: 28px;
+}
+
+.site-brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.site-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(150deg, #17c79c, #0a7d61);
+  color: #03130f;
+  box-shadow: 0 8px 20px -10px rgba(23, 199, 156, 0.9);
+}
+
+.site-brand b {
+  display: block;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.site-brand small {
+  display: block;
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--site-ink-2);
+}
+
+.site-nav {
+  display: flex;
+  gap: 22px;
+  margin-left: auto;
+  font-size: 13.5px;
+  color: var(--site-ink-2);
+  font-weight: 500;
+}
+
+.site-nav a:hover {
+  color: var(--site-brand-dark);
+}
+
+.site-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+}
+
+.site-phone {
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.site-phone:hover {
+  color: var(--site-brand-dark);
+}
+
+/* ─── Кнопки ─────────────────────────────────────────────────────────────── */
+
+.site-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  transition: transform 0.12s var(--ease), background 0.16s, border-color 0.16s, box-shadow 0.16s;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.site-btn:active {
+  transform: translateY(1px);
+}
+
+.site-btn-primary {
+  background: linear-gradient(180deg, #12a884, #0c8f70);
+  color: #fff;
+  box-shadow: 0 12px 26px -14px rgba(14, 158, 123, 0.95);
+}
+
+.site-btn-primary:hover {
+  background: linear-gradient(180deg, #14b58e, #0a7d61);
+}
+
+.site-btn-primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.site-btn-ghost {
+  background: #fff;
+  border-color: var(--site-line);
+  color: var(--site-ink-2);
+}
+
+.site-btn-ghost:hover {
+  border-color: #c9dbdd;
+  color: var(--site-ink);
+}
+
+.site-btn-lg {
+  height: 50px;
+  padding: 0 24px;
+  font-size: 14.5px;
+  border-radius: 14px;
+}
+
+.site-btn-sm {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 12.5px;
+}
+
+/* ─── Герой ──────────────────────────────────────────────────────────────── */
+
+.site-hero {
+  padding: 72px 0 64px;
+  background:
+    radial-gradient(900px 420px at 80% -10%, rgba(23, 199, 156, 0.18), transparent 65%),
+    radial-gradient(700px 380px at 0% 20%, rgba(47, 111, 237, 0.08), transparent 70%),
+    var(--site-bg);
+}
+
+.site-hero-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.9fr);
+  gap: 56px;
+  align-items: center;
+}
+
+.site-eyebrow {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--site-brand-dark);
+  background: rgba(14, 158, 123, 0.08);
+  border: 1px solid rgba(14, 158, 123, 0.18);
+  padding: 5px 10px;
+  border-radius: 99px;
+}
+
+.site-hero h1 {
+  margin-top: 18px;
+  font-size: 46px;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  font-weight: 700;
+}
+
+.site-hero-text {
+  margin-top: 18px;
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--site-ink-2);
+  max-width: 520px;
+}
+
+.site-hero-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+
+.site-trust {
+  display: flex;
+  gap: 30px;
+  margin-top: 40px;
+  padding-top: 26px;
+  border-top: 1px solid var(--site-line);
+  flex-wrap: wrap;
+}
+
+.site-trust b {
+  display: block;
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
+.site-trust span {
+  font-size: 12px;
+  color: var(--site-ink-2);
+}
+
+/* Карточка справа */
+.site-hero-card {
+  background: #fff;
+  border: 1px solid var(--site-line);
+  border-radius: 22px;
+  box-shadow: 0 30px 70px -40px rgba(8, 24, 31, 0.45);
+  overflow: hidden;
+}
+
+.site-hero-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  background: linear-gradient(120deg, #0b1d26, #12323f);
+  color: #dff0ec;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.site-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  background: #2fd3a4;
+  box-shadow: 0 0 0 3px rgba(47, 211, 164, 0.18);
+}
+
+.site-hero-card-body {
+  padding: 16px 18px 6px;
+  display: grid;
+  gap: 12px;
+}
+
+.site-mini-doctor {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+
+.site-mini-doctor b {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.site-mini-doctor span {
+  color: var(--site-ink-2);
+  font-size: 11.5px;
+}
+
+.site-mini-doctor em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b57a12;
+}
+
+.site-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.site-avatar-lg {
+  width: 52px;
+  height: 52px;
+  border-radius: 15px;
+  font-size: 15px;
+}
+
+.site-hero-card-note {
+  padding: 4px 18px 18px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--site-ink-2);
+}
+
+/* ─── Секции ─────────────────────────────────────────────────────────────── */
+
+.site-section {
+  padding: 64px 0;
+}
+
+.site-section-alt {
+  background: #fff;
+  border-top: 1px solid var(--site-line);
+  border-bottom: 1px solid var(--site-line);
+}
+
+.site-section-head {
+  max-width: 640px;
+  margin-bottom: 34px;
+}
+
+.site-section-head h2 {
+  margin-top: 14px;
+  font-size: 31px;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+}
+
+.site-section-head p {
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--site-ink-2);
+}
+
+/* Услуги */
+.site-services {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
+  gap: 14px;
+}
+
+.site-service {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  text-align: left;
+  padding: 18px;
+  background: #fff;
+  border: 1px solid var(--site-line);
+  border-radius: 16px;
+  transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease), border-color 0.18s;
+}
+
+.site-section-alt .site-service {
+  background: #fbfdfc;
+}
+
+.site-service:hover {
+  transform: translateY(-3px);
+  border-color: rgba(14, 158, 123, 0.4);
+  box-shadow: 0 20px 40px -28px rgba(8, 24, 31, 0.4);
+}
+
+.site-service b {
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+
+.site-chip {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--site-brand-dark);
+  background: rgba(14, 158, 123, 0.1);
+  border-radius: 99px;
+  padding: 3px 9px;
+}
+
+.site-service-desc {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--site-ink-2);
+  min-height: 38px;
+}
+
+.site-service-foot {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.site-service-foot strong {
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+
+.site-service-foot em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--site-ink-2);
+}
+
+/* Врачи */
+.site-doctors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 14px;
+}
+
+.site-doctor {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid var(--site-line);
+  border-radius: 18px;
+}
+
+.site-doctor b {
+  margin-top: 8px;
+  font-size: 14.5px;
+  letter-spacing: -0.01em;
+}
+
+.site-doctor-specialty {
+  font-size: 12px;
+  color: var(--site-ink-2);
+}
+
+.site-doctor-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 6px 0 12px;
+  font-size: 11px;
+}
+
+.site-doctor-meta span {
+  padding: 3px 8px;
+  border-radius: 7px;
+  background: #f3f8f7;
+  color: var(--site-ink-2);
+  border: 1px solid var(--site-line);
+}
+
+/* ─── Запись ─────────────────────────────────────────────────────────────── */
+
+.site-booking {
+  padding: 28px;
+  background: #fff;
+  border: 1px solid var(--site-line);
+  border-radius: 22px;
+  box-shadow: 0 30px 60px -46px rgba(8, 24, 31, 0.4);
+  display: grid;
+  gap: 20px;
+}
+
+.site-booking-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.site-field {
+  display: grid;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--site-ink-2);
+}
+
+.site-field-wide {
+  grid-column: 1 / -1;
+}
+
+.site-field input,
+.site-field select {
+  height: 44px;
+  padding: 0 13px;
+  border-radius: 12px;
+  border: 1px solid var(--site-line);
+  background: #fbfdfc;
+  font-size: 13.5px;
+  color: var(--site-ink);
+  outline: none;
+  font-weight: 500;
+  transition: border-color 0.16s, box-shadow 0.16s, background 0.16s;
+  width: 100%;
+}
+
+.site-field input:focus,
+.site-field select:focus {
+  background: #fff;
+  border-color: rgba(14, 158, 123, 0.55);
+  box-shadow: 0 0 0 4px rgba(14, 158, 123, 0.14);
+}
+
+.site-slots {
+  border-top: 1px dashed var(--site-line);
+  padding-top: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.site-slots-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--site-ink-2);
+}
+
+.site-slots-head em {
+  font-style: normal;
+  font-weight: 500;
+  color: #7d929b;
+  font-size: 11.5px;
+}
+
+.site-slot-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.site-slot {
+  height: 38px;
+  padding: 0 15px;
+  border-radius: 10px;
+  border: 1px solid #cdeee2;
+  background: #f1fbf7;
+  color: #075e46;
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.14s;
+}
+
+.site-slot:hover {
+  border-color: var(--site-brand);
+  transform: translateY(-1px);
+}
+
+.site-slot.active {
+  background: linear-gradient(180deg, #12a884, #0c8f70);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 8px 18px -12px rgba(14, 158, 123, 0.9);
+}
+
+.site-muted {
+  font-size: 12.5px;
+  color: var(--site-ink-2);
+}
+
+.site-booking-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--site-line);
+  flex-wrap: wrap;
+}
+
+.site-booking-summary {
+  display: grid;
+  gap: 2px;
+  font-size: 12.5px;
+  color: var(--site-ink-2);
+}
+
+.site-booking-summary b {
+  font-size: 13.5px;
+  color: var(--site-ink);
+}
+
+.site-booking-foot .site-btn {
+  margin-left: auto;
+}
+
+.site-consent {
+  font-size: 11px;
+  color: #87999f;
+  line-height: 1.5;
+}
+
+.site-alert {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fdecec;
+  border: 1px solid #f6d3d4;
+  color: #b8373c;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* Успех */
+.site-success {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 40px 24px;
+  background: #fff;
+  border: 1px solid var(--site-line);
+  border-radius: 22px;
+}
+
+.site-success-mark {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: var(--site-brand);
+  color: #fff;
+  box-shadow: 0 14px 30px -16px rgba(14, 158, 123, 0.9);
+}
+
+.site-success h3 {
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.site-success p {
+  font-size: 13.5px;
+  color: var(--site-ink-2);
+}
+
+.site-success-card {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 620px;
+  margin: 12px 0;
+}
+
+.site-success-card div {
+  padding: 12px;
+  border-radius: 12px;
+  background: #f6fbfa;
+  border: 1px solid var(--site-line);
+  display: grid;
+  gap: 3px;
+}
+
+.site-success-card span {
+  font-size: 11px;
+  color: var(--site-ink-2);
+}
+
+.site-success-card b {
+  font-size: 12.5px;
+}
+
+.site-success-note {
+  max-width: 560px;
+  font-size: 12px !important;
+  line-height: 1.55;
+}
+
+.site-skeleton {
+  border-radius: 10px;
+  background: linear-gradient(90deg, #eef4f5 25%, #f7fbfb 50%, #eef4f5 75%);
+  background-size: 300% 100%;
+  animation: site-shimmer 1.3s infinite linear;
+}
+
+@keyframes site-shimmer {
+  to {
+    background-position: -300% 0;
+  }
+}
+
+/* ─── Подвал ─────────────────────────────────────────────────────────────── */
+
+.site-footer {
+  padding: 36px 0;
+  border-top: 1px solid var(--site-line);
+  background: #fff;
+}
+
+.site-footer-inner {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+  color: var(--site-ink-2);
+}
+
+.site-footer-inner div {
+  display: grid;
+  gap: 4px;
+}
+
+.site-footer-inner b {
+  color: var(--site-ink);
+  font-size: 14px;
+}
+
+.site-footer-inner a:hover {
+  color: var(--site-brand-dark);
+}
+
+.site-footer-link {
+  margin-top: 6px;
+  color: #8ea1a8;
+  font-size: 11.5px;
+}
+
+/* ─── Адаптив ────────────────────────────────────────────────────────────── */
+
+@media (max-width: 980px) {
+  .site-hero-inner {
+    grid-template-columns: 1fr;
+    gap: 34px;
+  }
+  .site-hero h1 {
+    font-size: 36px;
+  }
+  .site-hero-card {
+    max-width: 460px;
+  }
+}
+
+@media (max-width: 760px) {
+  .site-shell {
+    padding: 0 18px;
+  }
+  .site-nav {
+    display: none;
+  }
+  .site-phone {
+    display: none;
+  }
+  .site-hero {
+    padding: 44px 0 40px;
+  }
+  .site-hero h1 {
+    font-size: 29px;
+  }
+  .site-hero-text {
+    font-size: 14px;
+  }
+  .site-section {
+    padding: 44px 0;
+  }
+  .site-section-head h2 {
+    font-size: 24px;
+  }
+  .site-booking {
+    padding: 18px;
+  }
+  .site-booking-grid,
+  .site-success-card {
+    grid-template-columns: 1fr;
+  }
+  .site-trust {
+    gap: 20px;
+  }
+  .site-booking-foot .site-btn {
+    margin-left: 0;
+    width: 100%;
+  }
+}

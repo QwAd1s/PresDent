@@ -3,6 +3,8 @@ dist/
 .env
 .env.local
 server/data/db.json
+server/data/pglite/
+.tmp/
 *.log
 .DS_Store
 .vscode/

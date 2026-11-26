@@ -1,6 +1,7 @@
 import type { Channel, Lead, LeadMessage, LeadPriority } from '../shared/types'
 import { addEvent, getDb, newId, saveDb } from './store'
 import { broadcast } from './realtime'
+import { notifyStaff } from './delivery'
 
 export interface IncomingMessage {
   channel: Channel
@@ -111,6 +112,12 @@ export function ingestIncoming(
     text: `Новая заявка · ${lead.name}: ${message.text}`,
   })
   broadcast('lead:new', lead)
+
+  // сотрудники получают уведомление в Telegram (если настроен)
+  void notifyStaff(
+    `<b>Новая заявка</b> (${lead.channel})\n${lead.name}${lead.phone ? ` · ${lead.phone}` : ''}\n` +
+      `${lead.service ?? 'без услуги'}\n\n${message.text}`,
+  )
 
   return { lead, created: true, message }
 }

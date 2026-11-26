@@ -80,6 +80,9 @@ export interface Appointment {
   durationMin: number
   status: AppointmentStatus
   channel: Channel
+  note?: string
+  cancelledReason?: string
+  createdAt?: string
 }
 
 export interface Review {
@@ -141,6 +144,10 @@ export interface ClinicSettings {
   notifyWhatsapp: boolean
   notifyEmail: boolean
   firstResponseMinutes: number
+  /** За сколько часов до приёма напоминать пациенту */
+  reminderHours?: number
+  /** Через сколько часов после приёма просить отзыв */
+  reviewDelayHours?: number
 }
 
 export interface ChannelEvent {
@@ -154,6 +161,95 @@ export interface ChannelEvent {
 export interface LeadsResponse {
   items: Lead[]
   counts: Record<LeadStatus, number> & { all: number }
+}
+
+// ─── Пользователи и доступы ─────────────────────────────────────────────────
+
+export type UserRole = 'owner' | 'admin' | 'doctor'
+
+export interface User {
+  id: string
+  name: string
+  email: string
+  role: UserRole
+  /** Привязка к врачу для роли doctor */
+  doctorId?: string
+  /** false — доступ отключён (увольнение, отпуск) */
+  active?: boolean
+  createdAt: string
+  lastLoginAt?: string
+}
+
+/** Как пользователь хранится на сервере (в API и на фронт не отдаётся) */
+export interface StoredUser extends User {
+  passwordHash: string
+}
+
+export type AuditEntity =
+  | 'auth'
+  | 'lead'
+  | 'appointment'
+  | 'review'
+  | 'settings'
+  | 'user'
+  | 'patient'
+  | 'reminder'
+
+export interface AuditRecord {
+  id: string
+  at: string
+  userId?: string
+  userName: string
+  action: string
+  entity: AuditEntity
+  entityId?: string
+  details?: string
+}
+
+export interface SessionRecord {
+  id: string
+  userId: string
+  createdAt: string
+  expiresAt: string
+  userAgent?: string
+}
+
+export const ROLE_LABEL: Record<UserRole, string> = {
+  owner: 'Владелец',
+  admin: 'Администратор',
+  doctor: 'Врач',
+}
+
+/** Что каждый роль умеет в интерфейсе */
+export const ROLE_SCOPE: Record<UserRole, string> = {
+  owner: 'Полный доступ, настройки, команда',
+  admin: 'Заявки, пациенты, расписание, отзывы',
+  doctor: 'Своё расписание и пациенты',
+}
+
+// ─── Напоминания ────────────────────────────────────────────────────────────
+
+export type ReminderKind = 'appointment' | 'review'
+
+export type ReminderStatus = 'pending' | 'sent' | 'dry_run' | 'failed' | 'skipped'
+
+export type DeliveryChannel = 'whatsapp' | 'telegram' | 'sms' | 'email'
+
+export interface Reminder {
+  id: string
+  kind: ReminderKind
+  appointmentId: string
+  patientName: string
+  phone: string
+  channel: DeliveryChannel
+  text: string
+  /** Когда отправлять */
+  sendAt: string
+  status: ReminderStatus
+  attempts: number
+  createdAt: string
+  sentAt?: string
+  error?: string
 }
 
 export const CHANNEL_LABEL: Record<Channel, string> = {

@@ -1,5 +1,6 @@
 import type {
   Appointment,
+  AuditRecord,
   Channel,
   ChannelState,
   ClinicSettings,
@@ -7,11 +8,15 @@ import type {
   Lead,
   LeadsResponse,
   Patient,
+  Reminder,
   Review,
   Stats,
+  User,
+  UserRole,
 } from '../../shared/types'
 import * as demo from './mock'
 import { assistantReply, type AssistantPending, type AssistantReply } from '../../shared/assistant'
+import type { SlotOffer } from '../../shared/slots'
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -39,6 +44,10 @@ async function http<T>(path: string, init?: RequestInit): Promise<T | null> {
       headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
       signal: AbortSignal.timeout(2_500),
     })
+    if (response.status === 401) {
+      emit('auth:expired')
+      return null
+    }
     if (!response.ok) return null
     return (await response.json()) as T
   } catch {
@@ -46,6 +55,253 @@ async function http<T>(path: string, init?: RequestInit): Promise<T | null> {
     emit('demo')
     return null
   }
+}
+
+// ─── Авторизация ────────────────────────────────────────────────────────────
+
+const DEMO_USER_KEY = 'president.demoUser'
+export const DEMO_PASSWORD = 'president2026'
+
+export const DEMO_ACCOUNTS: { email: string; role: UserRole; name: string }[] = [
+  { email: 'owner@president.ru', role: 'owner', name: 'Мадина Ибрагимова' },
+  { email: 'admin@president.ru', role: 'admin', name: 'Айшат Батаева' },
+  { email: 'doctor@president.ru', role: 'doctor', name: 'Исмаилова Мадина' },
+]
+
+function demoUser(email: string): User {
+  const account = DEMO_ACCOUNTS.find((item) => item.email === email) ?? DEMO_ACCOUNTS[1]
+  return {
+    id: `demo-${account.role}`,
+    name: account.name,
+    email: account.email,
+    role: account.role,
+    createdAt: new Date().toISOString(),
+  }
+}
+
+export async function loginRequest(
+  email: string,
+  password: string,
+): Promise<{ ok: boolean; user?: User; error?: string }> {
+  const normalized = email.trim().toLowerCase()
+
+  if (!demoMode) {
+    try {
+      const response = await fetch(`${BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalized, password }),
+        signal: AbortSignal.timeout(6_000),
+      })
+
+      if (response.ok) {
+        const data = (await response.json()) as { user: User }
+        return { ok: true, user: data.user }
+      }
+
+      const data = (await response.json().catch(() => null)) as { error?: string } | null
+      return { ok: false, error: data?.error ?? 'Не удалось войти' }
+    } catch {
+      demoMode = true
+      emit('demo')
+    }
+  }
+
+  // демо-режим: данные живут в браузере, проверка пароля локальная
+  const account = DEMO_ACCOUNTS.find((item) => item.email === normalized)
+  if (!account || password !== DEMO_PASSWORD) {
+    return { ok: false, error: 'Неверный e-mail или пароль' }
+  }
+  const user = demoUser(normalized)
+  localStorage.setItem(DEMO_USER_KEY, JSON.stringify(user))
+  return { ok: true, user }
+}
+
+export async function meRequest(): Promise<User | null> {
+  if (!demoMode) {
+    try {
+      const response = await fetch(`${BASE}/api/auth/me`, { signal: AbortSignal.timeout(3_500) })
+      if (response.status === 401) return null
+      if (response.ok) {
+        const data = (await response.json()) as { user: User }
+        return data.user
+      }
+    } catch {
+      demoMode = true
+      emit('demo')
+    }
+  }
+
+  const cached = localStorage.getItem(DEMO_USER_KEY)
+  return cached ? (JSON.parse(cached) as User) : null
+}
+
+export async function logoutRequest(): Promise<void> {
+  localStorage.removeItem(DEMO_USER_KEY)
+  if (demoMode) return
+  try {
+    await fetch(`${BASE}/api/auth/logout`, { method: 'POST', signal: AbortSignal.timeout(3_000) })
+  } catch {
+    /* выходим локально в любом случае */
+  }
+}
+
+export async function changePasswordRequest(
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ ok: boolean; error?: string }> {
+  if (demoMode) {
+    return currentPassword === DEMO_PASSWORD
+      ? { ok: true }
+      : { ok: false, error: 'В демо-режиме пароль — president2026' }
+  }
+
+  try {
+    const response = await fetch(`${BASE}/api/auth/password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ currentPassword, newPassword }),
+      signal: AbortSignal.timeout(6_000),
+    })
+
+    if (response.ok) return { ok: true }
+    const data = (await response.json().catch(() => null)) as { error?: string } | null
+    return { ok: false, error: data?.error ?? 'Не удалось сменить пароль' }
+  } catch {
+    return { ok: false, error: 'Сервер недоступен' }
+  }
+}
+
+export interface TeamPayload {
+  items: User[]
+  online: string[]
+}
+
+export async function getTeam(): Promise<TeamPayload> {
+  return (await http<TeamPayload>('/api/users')) ?? { items: [], online: [] }
+}
+
+// ─── Управление сотрудниками и журнал ───────────────────────────────────────
+
+async function sendJson<T>(
+  path: string,
+  method: 'POST' | 'PATCH' | 'PUT' | 'DELETE',
+  body: unknown,
+): Promise<{ ok: boolean; data?: T; error?: string }> {
+  if (demoMode) return { ok: false, error: 'В демо-режиме действие недоступно' }
+
+  try {
+    const response = await fetch(`${BASE}${path}`, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8_000),
+    })
+
+    if (response.ok) return { ok: true, data: (await response.json()) as T }
+
+    if (response.status === 401) {
+      emit('auth:expired')
+      return { ok: false, error: 'Сессия истекла, войдите заново' }
+    }
+
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null
+    return { ok: false, error: payload?.error ?? 'Не удалось выполнить действие' }
+  } catch {
+    demoMode = true
+    emit('demo')
+    return { ok: false, error: 'Сервер недоступен' }
+  }
+}
+
+export async function createUser(input: {
+  name: string
+  email: string
+  role: UserRole
+  doctorId?: string
+  password?: string
+}): Promise<{ ok: boolean; user?: User; temporaryPassword?: string; error?: string }> {
+  const result = await sendJson<{ user: User; temporaryPassword?: string }>('/api/users', 'POST', input)
+  return { ok: result.ok, user: result.data?.user, temporaryPassword: result.data?.temporaryPassword, error: result.error }
+}
+
+export async function updateUser(
+  id: string,
+  patch: { name?: string; role?: UserRole; active?: boolean; doctorId?: string },
+): Promise<{ ok: boolean; user?: User; error?: string }> {
+  const result = await sendJson<User>(`/api/users/${id}`, 'PATCH', patch)
+  return { ok: result.ok, user: result.data, error: result.error }
+}
+
+export async function resetUserPassword(id: string): Promise<{ ok: boolean; password?: string; error?: string }> {
+  const result = await sendJson<{ password: string }>(`/api/users/${id}/password`, 'POST', {})
+  return { ok: result.ok, password: result.data?.password, error: result.error }
+}
+
+export async function logoutOtherSessions(): Promise<{ ok: boolean; ended?: number; error?: string }> {
+  const result = await sendJson<{ ended: number }>('/api/auth/logout-others', 'POST', {})
+  return { ok: result.ok, ended: result.data?.ended, error: result.error }
+}
+
+export interface AuditPayload {
+  items: AuditRecord[]
+  total: number
+}export async function getAudit(params: { entity?: string; q?: string; limit?: number } = {}): Promise<AuditPayload> {
+  const query = new URLSearchParams()
+  if (params.entity && params.entity !== 'all') query.set('entity', params.entity)
+  if (params.q) query.set('q', params.q)
+  if (params.limit) query.set('limit', String(params.limit))
+
+  const suffix = query.toString() ? `?${query}` : ''
+  return (await http<AuditPayload>(`/api/audit${suffix}`)) ?? { items: [], total: 0 }
+}
+
+// ─── Напоминания ────────────────────────────────────────────────────────────
+
+export interface ReminderStats {
+  total: number
+  pending: number
+  sent: number
+  dryRun: number
+  failed: number
+  dueNow: number
+}
+
+export interface RemindersPayload {
+  items: Reminder[]
+  stats: ReminderStats
+}
+
+const EMPTY_REMINDER_STATS: ReminderStats = { total: 0, pending: 0, sent: 0, dryRun: 0, failed: 0, dueNow: 0 }
+
+export async function getReminders(status = 'all'): Promise<RemindersPayload> {
+  const suffix = status && status !== 'all' ? `?status=${status}` : ''
+  return (await http<RemindersPayload>(`/api/reminders${suffix}`)) ?? { items: [], stats: EMPTY_REMINDER_STATS }
+}
+
+export async function runReminders(): Promise<{
+  ok: boolean
+  planned?: { created: number; due: number }
+  sent?: number
+  dryRun?: number
+  failed?: number
+  stats?: ReminderStats
+  error?: string
+}> {
+  const result = await sendJson<{
+    planned: { created: number; due: number }
+    sent: number
+    dryRun: number
+    failed: number
+    stats: ReminderStats
+  }>('/api/reminders/run', 'POST', {})
+
+  return { ...(result.data ?? {}), ok: result.ok, error: result.error }
+}
+
+export async function skipReminder(id: string): Promise<{ ok: boolean; error?: string }> {
+  const result = await sendJson<Reminder>(`/api/reminders/${id}/skip`, 'POST', {})
+  return { ok: result.ok, error: result.error }
 }
 
 // ─── Заявки ─────────────────────────────────────────────────────────────────
@@ -111,6 +367,49 @@ export async function getDoctors(): Promise<{ items: Doctor[] }> {
 
 export async function getAppointments(): Promise<{ items: Appointment[] }> {
   return (await http<{ items: Appointment[] }>('/api/appointments')) ?? demo.getAppointments()
+}
+
+// ─── Записи на приём ────────────────────────────────────────────────────────
+
+export interface SlotsPayload {
+  items: SlotOffer[]
+  workingDay: boolean
+  dayLabel: string
+}/** Свободные окна врача на конкретный день (YYYY-MM-DD). */
+export async function getSlots(
+  doctorId: string,
+  date: string,
+  service: string,
+): Promise<SlotsPayload> {
+  const query = new URLSearchParams({ doctorId, date, service })
+  const live = await http<SlotsPayload>(`/api/slots?${query}`)
+  if (live) return live
+
+  return demo.getSlots(doctorId, date, service)
+}
+
+export async function updateAppointment(
+  id: string,
+  patch: { status?: Appointment['status']; note?: string; cancelledReason?: string },
+): Promise<{ ok: boolean; appointment?: Appointment; error?: string }> {
+  const live = await http<Appointment>(`/api/appointments/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(patch),
+  })
+  if (live) return { ok: true, appointment: live }
+  return demo.updateAppointment(id, patch)
+}
+
+export async function rescheduleAppointment(
+  id: string,
+  start: string,
+): Promise<{ ok: boolean; appointment?: Appointment; error?: string }> {
+  const live = await http<Appointment>(`/api/appointments/${id}/reschedule`, {
+    method: 'POST',
+    body: JSON.stringify({ start }),
+  })
+  if (live) return { ok: true, appointment: live }
+  return demo.rescheduleAppointment(id, start)
 }
 
 // ─── ИИ-админ ───────────────────────────────────────────────────────────────
@@ -239,6 +538,13 @@ export function connectRealtime() {
       emit('lead:message', JSON.parse((event as MessageEvent).data)),
     )
     stream.addEventListener('lead:update', (event) => emit('lead:update', JSON.parse((event as MessageEvent).data)))
+    stream.addEventListener('appointment:new', (event) =>
+      emit('appointment:new', JSON.parse((event as MessageEvent).data)),
+    )
+    stream.addEventListener('appointment:update', (event) =>
+      emit('appointment:update', JSON.parse((event as MessageEvent).data)),
+    )
+    stream.addEventListener('audit:new', (event) => emit('audit:new', JSON.parse((event as MessageEvent).data)))
     stream.onerror = () => {
       stream?.close()
       stream = null

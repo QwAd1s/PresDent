@@ -20,11 +20,16 @@
                    смена статуса/услуги + заметка
 База пациентов     карточки, визиты, суммы, теги, лечащий врач, заметки
 Врачи              рейтинг, загрузка, ближайшие окна, специализация
-Расписание         недельная сетка по врачам, текущее время, карточка приёма
+Расписание         недельная сетка по врачам, текущее время, карточка приёма;
+                   создание записи по свободным окнам, перенос, отмена, отметки приёма
 Отзывы             лента с оценками, распределение, публичный ответ
 Каналы и интеграции статус WhatsApp/Instagram/сайта, URL вебхуков, журнал событий,
                    тестовая заявка, инструкция по подключению
-Настройки          профиль клиники, SLA первого ответа, уведомления, команда и доступы
+Settings           профиль клиники, SLA первого ответа, уведомления, команда и доступы
+Журнал действий    кто и что менял: фильтры, поиск, экспорт CSV
+Напоминания        очередь сообщений пациенту: за сутки до приёма и запрос отзыва,
+                   статусы доставки, ручной запуск и пропуск
+Публичный сайт     лендинг клиники и онлайн-запись пациента (без авторизации)
 ИИ-админ           плавающий помощник на всех страницах: подсказка по разделам,
                    свободные окна, проверка занятости врача, запись пациента
 ```
@@ -64,7 +69,24 @@ VK, Avito) добавляется одним парсером и не требу
 Вне окна нужен утверждённый шаблон (message template). Для напоминаний о приёме — шаблоны
 `appointment_reminder`, для отзыва — `review_request`.
 
-## 4. Модель данных
+## 4. Хранение данных
+
+Драйвер выбирается переменной `DB_DRIVER` (`json` | `pglite` | `postgres`), код маршрутов не меняется.
+
+```
+PostgreSQL: entities(type,id,ord,data jsonb,updated_at) + meta
+        ▲ дифф-запись в транзакции (~120 мс дебаунс)
+        │
+   [память процесса] ◄── чтение на каждом запросе
+```
+
+- Документный слой: одна строка на сущность (заявка, приём, пациент, сотрудник, сессия, аудит).
+- Чтение из памяти, запись — только изменённых сущностей, атомарно.
+- `pglite` — настоящий Postgres в WASM для локальной разработки и тестов; `postgres` — продакшн через `DATABASE_URL`.
+- Сид применяется только к пустой базе; версия фикстур не перетирает существующие данные.
+- Следующий шаг при росте объёмов — нормализованные таблицы и репозитории (маршруты уже изолированы за `getDb()`).
+
+## 5. Модель данных
 
 ```ts
 Lead {            // заявка = диалог с пациентом по одному каналу
@@ -83,15 +105,24 @@ Doctor { id, name, specialty, color, rating, reviewsCount, experienceYears,
          loadPercent, nextSlot, todayAppointments, workingDays[] }
 
 Appointment { id, patientName, phone, doctorId, service, start,
-              durationMin, status: 'confirmed' | 'waiting' | 'done' | 'cancelled', channel }
+              durationMin, status: 'confirmed' | 'waiting' | 'done' | 'cancelled', channel,
+              note?, cancelledReason?, createdAt? }
+
+Service { id, title, category, price, durationMin, specialty, description? }   // shared/services.ts
 
 Review { id, author, rating, text, at, channel, answered, reply?, doctorId? }
+
+AuditRecord { id, at, userId?, userName, action, entity, entityId?, details? }
+
+Reminder { id, kind: 'appointment' | 'review', appointmentId, patientName, phone,
+           channel, text, sendAt, status: 'pending' | 'sent' | 'dry_run' | 'failed' | 'skipped',
+           attempts, createdAt, sentAt?, error? }
 ```
 
 Сейчас данные лежат в `server/data/db.json` (создаётся при первом запуске из `shared/fixtures.ts`).
 Для продакшена — PostgreSQL + Prisma; схема выше переносится один-в-один.
 
-## 5. API
+## 6. API
 
 | Метод | Путь | Назначение |
 |---|---|---|
@@ -101,19 +132,42 @@ Review { id, author, rating, text, at, channel, answered, reply?, doctorId? }
 | POST | `/api/leads/:id/messages` | ответ пациенту в его канал |
 | POST | `/api/leads` | ручная заявка |
 | GET | `/api/patients` · `/api/doctors` · `/api/appointments` | справочники |
+| GET | `/api/slots?doctorId=&date=&service=` | свободные окна врача на день |
+| PATCH | `/api/appointments/:id` | статус приёма: confirmed / waiting / done / cancelled |
+| POST | `/api/appointments/:id/reschedule` | перенос с проверкой занятости (409 при конфликте) |
 | GET | `/api/reviews` · POST `/api/reviews/:id/reply` | отзывы и ответы |
 | GET | `/api/channels` · POST `/api/channels/test` | статус каналов, тестовая заявка |
 | GET | `/api/events-log` | журнал событий |
 | GET | `/api/settings` · PUT `/api/settings` | настройки клиники |
+| POST | `/api/auth/login` · `/api/auth/logout` · GET `/api/auth/me` | вход, выход, текущий пользователь (httpOnly-сессия) |
+| POST | `/api/auth/password` | смена своего пароля с отзывом остальных сессий |
+| GET | `/api/users` | команда и онлайн-статусы (owner/admin) |
+| POST | `/api/users` · PATCH `/api/users/:id` · POST `/api/users/:id/password` | приглашение, роли, отключение доступа, сброс пароля (owner) |
+| POST | `/api/auth/logout-others` | завершить остальные сессии сотрудника |
+| GET | `/api/audit?entity=&q=&limit=` | журнал действий с фильтрами (owner/admin) |
+| GET | `/api/public/clinic` | публичная информация: клиника, услуги, врачи |
+| GET | `/api/public/slots` | свободные окна для онлайн-записи |
+| POST | `/api/public/book` | онлайн-запись пациента: приём + пациент + заявка |
+| GET | `/api/reminders?status=` | очередь напоминаний и статистика |
+| POST | `/api/reminders/run` | спланировать и отправить просроченные |
+| POST | `/api/reminders/:id/skip` | убрать напоминание из очереди |
 | POST | `/api/assistant` | запрос к ИИ-админу: `{ text, page, pending? }` → ответ + слоты + действие записи |
 | POST | `/api/appointments` | создать запись на приём с проверкой занятости (409 при конфликте) |
 | GET | `/api/events` | SSE-поток для realtime |
 | GET/POST | `/api/webhooks/whatsapp` · `/instagram` · `/site` | приём событий Meta и формы сайта |
 
-## 6. Этапы развития
+## 7. Этапы развития
 
 **Сделано**
 - админ-панель: 8 разделов, дизайн-система, адаптив до планшета;
+- **авторизация**: страница входа, серверные сессии в httpOnly-cookie, scrypt-хеши паролей, роли owner/admin/doctor, ограничение API по ролям, лимит попыток входа, смена пароля с отзывом сессий;
+- **управление сотрудниками**: приглашения с временным паролем, смена ролей, отключение доступа с разрывом сессий, сброс пароля владельцем, «выйти на всех устройствах»;
+- **журнал действий**: аудит ключевых операций с фильтрами и экспортом CSV;
+- **хранение**: три драйвера (json / pglite / postgres), дифф-запись в транзакциях, сохранение при остановке;
+- **напоминания**: планировщик (за N часов до приёма и отзыв после), каналы WhatsApp/Telegram/SMS, статусы доставки, повторные попытки, снятие при отмене;
+- **деплой**: multi-stage Dockerfile, docker-compose с PostgreSQL и healthcheck, чек-лист переменных, инструкции для VPS/Render/Vercel;
+- **публичный сайт**: лендинг с услугами и врачами, онлайн-запись по свободным окнам, создание приёма/пациента/заявки, лимит заявок с IP;
+- **управление записями**: справочник услуг с ценами и длительностью, расчёт свободных окон, запись, перенос, отмена и статусы приёма с защитой от двойного бронирования;
 - единый инбокс заявок с историей диалога и отправкой ответов;
 - приём вебхуков WhatsApp Cloud API и Instagram Messaging, проверка подписи, дедупликация по ID;
 - журнал событий, тестовая заявка, SSE-обновление интерфейса;
@@ -122,6 +176,7 @@ Review { id, author, rating, text, at, channel, answered, reply?, doctorId? }
 
 **Следующее**
 1. **LLM для ассистента** — подключить модель через function calling к готовым инструментам (`freeSlots`, `createAppointment`, `getSchedule`), оставив ключ на сервере.
+2. **Приглашения сотрудников** — создание пользователей из интерфейса, гибкие права, журнал действий по пользователю.
 1. **Авторизация** — вход сотрудников (email + пароль / magic link), роли admin/owner/doctor, JWT-сессии.
 2. **PostgreSQL + Prisma** — замена JSON-файла, миграции, индексы по `channel + externalId`.
 3. **Очередь и ретраи** — BullMQ/Redis для исходящих сообщений и обработки вебхуков.
@@ -132,10 +187,22 @@ Review { id, author, rating, text, at, channel, answered, reply?, doctorId? }
 7. **Уведомления** — Telegram-бот и e-mail администратору о новой заявке и о просроченном SLA.
 8. **Аналитика** — воронка «обращение → запись → визит → повторный», отчёты по врачам и каналам.
 
-## 7. Технические решения
-
+## 8. Технические решения
 - **SSE вместо WebSocket** — нужен только сервер→клиент поток, SSE проще и проходит через прокси (`proxy_buffering off`).
 - **Единый ingestion-слой** — новый канал = один парсер, интерфейс не меняется.
 - **Демо-фолбэк на фронте** — `src/lib/api.ts` при недоступном API переключается на `src/lib/mock.ts`, поэтому макеты можно показывать клинике без бэкенда.
 - **Фикстуры в `shared/`** — одни и те же данные для сервера и демо-режима, нет расхождений.
 - **Никаких секретов во фронтенде** — токены Meta живут только в `.env` на сервере.
+
+## 9. Деплой
+
+```
+Dockerfile  ── multi-stage: build (vite) → runtime (prod-зависимости, tsx, dist)
+docker-compose.yml ── app:8787 + postgres:16 + том pgdata + healthcheck
+```
+
+- Runtime-образ содержит только production-зависимости (`express`, `pg`, `@electric-sql/pglite`, `tsx`); фронтенд — собранный `dist/`.
+- Health-check контейнера бьёт в `GET /api/health` (там же видно драйвер БД и режим отправки).
+- Приложение стартует после `pg_isready`; схема создаётся автоматически, пустая база засеивается демо-данными.
+- Секреты и режимы — через переменные окружения (`DB_DRIVER`, `DATABASE_URL`, `SEED_PASSWORD`, `PUBLIC_URL`, `DRY_RUN`, `COOKIE_SECURE`).
+- Альтернативы: VPS + pm2/nginx, Render/Railway (web service + managed Postgres), Vercel для фронта с отдельным API.
