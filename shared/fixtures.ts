@@ -27,7 +27,7 @@ const dayKey = (offset: number) => {
 export const doctors: Doctor[] = [
   {
     id: 'doc-1',
-    name: 'Ахмедова Марина Сергеевна',
+    name: 'Исмаилова Мадина Ахмадовна',
     specialty: 'Врач-терапевт',
     color: '#0E9E7B',
     rating: 4.9,
@@ -40,7 +40,7 @@ export const doctors: Doctor[] = [
   },
   {
     id: 'doc-2',
-    name: 'Ковалёв Игорь Петрович',
+    name: 'Магомадов Турпал Асланович',
     specialty: 'Хирург-имплантолог',
     color: '#2F6FED',
     rating: 4.8,
@@ -53,7 +53,7 @@ export const doctors: Doctor[] = [
   },
   {
     id: 'doc-3',
-    name: 'Лебедева Ольга Викторовна',
+    name: 'Яндарова Хеда Руслановна',
     specialty: 'Ортодонт',
     color: '#C94B8D',
     rating: 5.0,
@@ -66,7 +66,7 @@ export const doctors: Doctor[] = [
   },
   {
     id: 'doc-4',
-    name: 'Сафин Тимур Ренатович',
+    name: 'Байсултанов Ислам Вахаевич',
     specialty: 'Гигиенист',
     color: '#E8A93A',
     rating: 4.7,
@@ -79,7 +79,7 @@ export const doctors: Doctor[] = [
   },
   {
     id: 'doc-5',
-    name: 'Петрова Анна Ильинична',
+    name: 'Дадаева Петимат Сайд-Магомедовна',
     specialty: 'Детский стоматолог',
     color: '#8A5CF6',
     rating: 5.0,
@@ -92,7 +92,7 @@ export const doctors: Doctor[] = [
   },
   {
     id: 'doc-6',
-    name: 'Григорьев Дмитрий Олегович',
+    name: 'Арсанов Зелимхан Ибрагимович',
     specialty: 'Ортопед',
     color: '#0F8AA8',
     rating: 4.6,
@@ -108,7 +108,7 @@ export const doctors: Doctor[] = [
 export const patients: Patient[] = [
   {
     id: 'pat-1',
-    name: 'Елена Титова',
+    name: 'Мадина Тасуева',
     phone: '+7 925 441-90-63',
     birthDate: '1989-04-12',
     since: '2021-02-08',
@@ -122,7 +122,7 @@ export const patients: Patient[] = [
   },
   {
     id: 'pat-2',
-    name: 'Максим Орлов',
+    name: 'Адам Байсултанов',
     phone: '+7 916 703-11-24',
     birthDate: '1994-09-30',
     since: '2023-06-19',
@@ -135,7 +135,7 @@ export const patients: Patient[] = [
   },
   {
     id: 'pat-3',
-    name: 'Динара Абдуллаева',
+    name: 'Зарина Эльдарова',
     phone: '+7 917 233-88-40',
     birthDate: '1998-01-22',
     since: '2024-03-04',
@@ -148,7 +148,7 @@ export const patients: Patient[] = [
   },
   {
     id: 'pat-4',
-    name: 'Сергей Белов',
+    name: 'Аслан Вахидов',
     phone: '+7 999 120-45-77',
     birthDate: '1976-11-08',
     since: '2019-11-21',
@@ -162,7 +162,7 @@ export const patients: Patient[] = [
   },
   {
     id: 'pat-5',
-    name: 'Айгуль Смирнова',
+    name: 'Малика Гайсумова',
     phone: '+7 985 214-33-08',
     birthDate: '1991-07-17',
     since: '2022-08-30',
@@ -175,7 +175,7 @@ export const patients: Patient[] = [
   },
   {
     id: 'pat-6',
-    name: 'Наталья Фомина',
+    name: 'Айна Сайдулаева',
     phone: '+7 962 880-31-19',
     birthDate: '1985-03-03',
     since: '2020-05-14',
@@ -188,7 +188,7 @@ export const patients: Patient[] = [
   },
   {
     id: 'pat-7',
-    name: 'Роман Кузнецов',
+    name: 'Ислам Зубайраев',
     phone: '+7 903 555-77-12',
     birthDate: '2001-12-25',
     since: '2024-09-02',
@@ -201,7 +201,7 @@ export const patients: Patient[] = [
   },
   {
     id: 'pat-8',
-    name: 'Ольга Морозова',
+    name: 'Раиса Магомадова',
     phone: '+7 985 900-12-34',
     birthDate: '1969-06-11',
     since: '2018-01-15',
@@ -214,7 +214,7 @@ export const patients: Patient[] = [
   },
   {
     id: 'pat-9',
-    name: 'Иван Петров',
+    name: 'Умар Арсанов',
     phone: '+7 926 118-05-47',
     birthDate: '1993-02-19',
     since: '2025-04-11',
@@ -227,7 +227,7 @@ export const patients: Patient[] = [
   },
   {
     id: 'pat-10',
-    name: 'София Лебедева',
+    name: 'Милана Дадаева',
     phone: '+7 977 340-66-21',
     birthDate: '2016-08-27',
     since: '2023-02-20',
@@ -245,7 +245,7 @@ export const leads: Lead[] = [
   {
     id: 'lead-1',
     channel: 'whatsapp',
-    name: 'Айгуль Смирнова',
+    name: 'Малика Гайсумова',
     phone: '+7 985 214-33-08',
     handle: 'wa:79852143308',
     service: 'Имплантация',
@@ -273,8 +273,8 @@ export const leads: Lead[] = [
   {
     id: 'lead-2',
     channel: 'instagram',
-    name: 'Дарья Кузнецова',
-    handle: '@daria.kuznetsova',
+    name: 'Хава Исмаилова',
+    handle: '@khava.ism',
     service: 'Гигиена и чистка',
     status: 'new',
     priority: 'normal',
@@ -293,7 +293,7 @@ export const leads: Lead[] = [
   {
     id: 'lead-3',
     channel: 'site',
-    name: 'Максим Орлов',
+    name: 'Адам Байсултанов',
     phone: '+7 916 703-11-24',
     service: 'Лечение кариеса',
     status: 'in_progress',
@@ -312,7 +312,7 @@ export const leads: Lead[] = [
       {
         id: 'm-3-2',
         direction: 'out',
-        text: 'Здравствуйте, Максим! Подскажите, пожалуйста, когда вам удобно подойти — сегодня после 18:00 есть окно у Марины Сергеевны.',
+        text: 'Здравствуйте, Адам! Подскажите, пожалуйста, когда вам удобно подойти — сегодня после 18:00 есть окно у Мадины Ахмадовны.',
         at: minutesAgo(8),
         author: 'Администратор',
         delivery: 'read',
@@ -322,7 +322,7 @@ export const leads: Lead[] = [
   {
     id: 'lead-4',
     channel: 'whatsapp',
-    name: 'Роман К.',
+    name: 'Ислам З.',
     phone: '+7 903 555-77-12',
     handle: 'wa:79035557712',
     service: 'Ортодонтия',
@@ -343,8 +343,8 @@ export const leads: Lead[] = [
   {
     id: 'lead-5',
     channel: 'instagram',
-    name: 'Алина Муратова',
-    handle: '@alina_mrr',
+    name: 'Милана Эльмурзаева',
+    handle: '@milana.el',
     service: 'Эстетика',
     status: 'in_progress',
     priority: 'normal',
@@ -372,7 +372,7 @@ export const leads: Lead[] = [
   {
     id: 'lead-6',
     channel: 'whatsapp',
-    name: 'Елена Титова',
+    name: 'Мадина Тасуева',
     phone: '+7 925 441-90-63',
     handle: 'wa:79254419063',
     service: 'Удаление зуба',
@@ -382,18 +382,18 @@ export const leads: Lead[] = [
     createdAt: minutesAgo(150),
     updatedAt: minutesAgo(95),
     assignee: 'Администратор',
-    note: 'Записана на сегодня 16:00, врач — Ковалёв И. П.',
+    note: 'Записана на сегодня 16:00, врач — Магомадов Т. А.',
     messages: [
       {
         id: 'm-6-1',
         direction: 'in',
-        text: 'Марина Сергеевна сказала удалять восьмёрку. Можно записаться к хирургу?',
+        text: 'Мадина Ахмадовна сказала удалять восьмёрку. Можно записаться к хирургу?',
         at: minutesAgo(150),
       },
       {
         id: 'm-6-2',
         direction: 'out',
-        text: 'Елена, добрый день! Записала вас к Игорю Петровичу на сегодня в 16:00. За 2 часа до приёма не ешьте, пожалуйста.',
+        text: 'Мадина, добрый день! Записала вас к Турпалу Аслановичу на сегодня в 16:00. За 2 часа до приёма не ешьте, пожалуйста.',
         at: minutesAgo(95),
         author: 'Администратор',
         delivery: 'read',
@@ -403,7 +403,7 @@ export const leads: Lead[] = [
   {
     id: 'lead-7',
     channel: 'phone',
-    name: 'Сергей Белов',
+    name: 'Аслан Вахидов',
     phone: '+7 999 120-45-77',
     service: 'Консультация',
     status: 'booked',
@@ -424,8 +424,8 @@ export const leads: Lead[] = [
   {
     id: 'lead-8',
     channel: 'instagram',
-    name: 'Иван Петров',
-    handle: '@ivan.petrov',
+    name: 'Умар Арсанов',
+    handle: '@umar.ars',
     service: 'Имплантация',
     status: 'new',
     priority: 'normal',
@@ -444,7 +444,7 @@ export const leads: Lead[] = [
   {
     id: 'lead-9',
     channel: 'site',
-    name: 'Наталья Фомина',
+    name: 'Айна Сайдулаева',
     phone: '+7 962 880-31-19',
     service: 'Гигиена и чистка',
     status: 'closed',
@@ -463,7 +463,7 @@ export const leads: Lead[] = [
       {
         id: 'm-9-2',
         direction: 'out',
-        text: 'Наталья, записала вас на завтра в 10:00 к Тимуру Ренатовичу. Ждём!',
+        text: 'Айна, записала вас на завтра в 10:00 к Исламу Вахаевичу. Ждём!',
         at: minutesAgo(1_380),
         author: 'Администратор',
         delivery: 'read',
@@ -473,7 +473,7 @@ export const leads: Lead[] = [
   {
     id: 'lead-10',
     channel: 'whatsapp',
-    name: 'Динара А.',
+    name: 'Хеда А.',
     phone: '+7 917 233-88-40',
     handle: 'wa:79172338840',
     service: 'Лечение кариеса',
@@ -495,8 +495,8 @@ export const leads: Lead[] = [
   {
     id: 'lead-11',
     channel: 'instagram',
-    name: 'София Лебедева',
-    handle: '@sofia.l',
+    name: 'Айшат Дадаева',
+    handle: '@ayshat.d',
     service: 'Детская стоматология',
     status: 'new',
     priority: 'high',
@@ -515,7 +515,7 @@ export const leads: Lead[] = [
   {
     id: 'lead-12',
     channel: 'whatsapp',
-    name: 'Ольга Морозова',
+    name: 'Раиса Магомадова',
     phone: '+7 985 900-12-34',
     handle: 'wa:79859001234',
     service: 'Протезирование',
@@ -529,13 +529,13 @@ export const leads: Lead[] = [
       {
         id: 'm-12-1',
         direction: 'in',
-        text: 'Дмитрий Олегович обещал коронки к концу месяца. Уже готово?',
+        text: 'Зелимхан Ибрагимович обещал коронки к концу месяца. Уже готово?',
         at: minutesAgo(95),
       },
       {
         id: 'm-12-2',
         direction: 'out',
-        text: 'Ольга, добрый день! Коронки пришли, ждём вас в пятницу в 15:00 на примерку.',
+        text: 'Раиса, добрый день! Коронки пришли, ждём вас в пятницу в 15:00 на примерку.',
         at: minutesAgo(35),
         author: 'Администратор',
         delivery: 'delivered',
@@ -547,7 +547,7 @@ export const leads: Lead[] = [
 export const appointments: Appointment[] = [
   {
     id: 'ap-1',
-    patientName: 'Елена Титова',
+    patientName: 'Мадина Тасуева',
     phone: '+7 925 441-90-63',
     doctorId: 'doc-2',
     service: 'Удаление зуба',
@@ -558,7 +558,7 @@ export const appointments: Appointment[] = [
   },
   {
     id: 'ap-2',
-    patientName: 'Айгуль Смирнова',
+    patientName: 'Малика Гайсумова',
     phone: '+7 985 214-33-08',
     doctorId: 'doc-1',
     service: 'Лечение кариеса',
@@ -569,7 +569,7 @@ export const appointments: Appointment[] = [
   },
   {
     id: 'ap-3',
-    patientName: 'Максим Орлов',
+    patientName: 'Адам Байсултанов',
     phone: '+7 916 703-11-24',
     doctorId: 'doc-4',
     service: 'Гигиена и чистка',
@@ -580,7 +580,7 @@ export const appointments: Appointment[] = [
   },
   {
     id: 'ap-4',
-    patientName: 'София Лебедева',
+    patientName: 'Милана Дадаева',
     phone: '+7 977 340-66-21',
     doctorId: 'doc-5',
     service: 'Детский приём',
@@ -591,7 +591,7 @@ export const appointments: Appointment[] = [
   },
   {
     id: 'ap-5',
-    patientName: 'Ольга Морозова',
+    patientName: 'Раиса Магомадова',
     phone: '+7 985 900-12-34',
     doctorId: 'doc-6',
     service: 'Протезирование',
@@ -602,7 +602,7 @@ export const appointments: Appointment[] = [
   },
   {
     id: 'ap-6',
-    patientName: 'Роман Кузнецов',
+    patientName: 'Ислам Зубайраев',
     phone: '+7 903 555-77-12',
     doctorId: 'doc-3',
     service: 'Ортодонтия',
@@ -613,7 +613,7 @@ export const appointments: Appointment[] = [
   },
   {
     id: 'ap-7',
-    patientName: 'Елена Титова',
+    patientName: 'Мадина Тасуева',
     phone: '+7 925 441-90-63',
     doctorId: 'doc-2',
     service: 'Консультация',
@@ -624,7 +624,7 @@ export const appointments: Appointment[] = [
   },
   {
     id: 'ap-8',
-    patientName: 'Иван Петров',
+    patientName: 'Умар Арсанов',
     phone: '+7 926 118-05-47',
     doctorId: 'doc-1',
     service: 'Консультация',
@@ -635,7 +635,7 @@ export const appointments: Appointment[] = [
   },
   {
     id: 'ap-9',
-    patientName: 'Динара Абдуллаева',
+    patientName: 'Зарина Эльдарова',
     phone: '+7 917 233-88-40',
     doctorId: 'doc-3',
     service: 'Ортодонтия',
@@ -646,7 +646,7 @@ export const appointments: Appointment[] = [
   },
   {
     id: 'ap-10',
-    patientName: 'Айгуль Смирнова',
+    patientName: 'Малика Гайсумова',
     phone: '+7 985 214-33-08',
     doctorId: 'doc-4',
     service: 'Гигиена и чистка',
@@ -660,9 +660,9 @@ export const appointments: Appointment[] = [
 export const reviews: Review[] = [
   {
     id: 'rev-1',
-    author: 'Марина К.',
+    author: 'Мадина К.',
     rating: 5,
-    text: 'Огромное спасибо Марине Сергеевне! Лечила зуб, совершенно не больно, всё объяснила. Клиника чистая, администраторы внимательные.',
+    text: 'Огромное спасибо Мадине Ахмадовне! Лечила зуб, совершенно не больно, всё объяснила. Клиника чистая, администраторы внимательные.',
     at: minutesAgo(180),
     channel: 'whatsapp',
     answered: false,
@@ -670,18 +670,18 @@ export const reviews: Review[] = [
   },
   {
     id: 'rev-2',
-    author: 'Артём Волков',
+    author: 'Арби Исмаилов',
     rating: 5,
-    text: 'Поставил имплант у Игоря Петровича полгода назад — всё отлично, прижился. Сделали КТ, показали на экране план лечения.',
+    text: 'Поставил имплант у Турпала Аслановича полгода назад — всё отлично, прижился. Сделали КТ, показали на экране план лечения.',
     at: minutesAgo(1_100),
     channel: 'instagram',
     answered: true,
-    reply: 'Артём, спасибо большое! Передадим Игорю Петровичу 💚',
+    reply: 'Арби, спасибо большое! Передадим Турпалу Аслановичу 💚',
     doctorId: 'doc-2',
   },
   {
     id: 'rev-3',
-    author: 'Ксения Л.',
+    author: 'Хава Л.',
     rating: 4,
     text: 'Всё хорошо, но ждала приёма 25 минут. Врач — золотые руки, поэтому не снижаю сильно.',
     at: minutesAgo(2_400),
@@ -691,18 +691,18 @@ export const reviews: Review[] = [
   },
   {
     id: 'rev-4',
-    author: 'Дмитрий Савельев',
+    author: 'Джабраил Дадаев',
     rating: 5,
-    text: 'Привёл ребёнка к Анне Ильиничне — она настоящий волшебник. Дочь теперь сама просится на приём.',
+    text: 'Привёл ребёнка к Петимат Сайд-Магомедовне — она настоящий волшебник. Дочь теперь сама просится на приём.',
     at: minutesAgo(3_000),
     channel: 'site',
     answered: true,
-    reply: 'Спасибо! Анне Ильиничне очень приятно 🤍',
+    reply: 'Спасибо! Петимат Сайд-Магомедовне очень приятно 🤍',
     doctorId: 'doc-5',
   },
   {
     id: 'rev-5',
-    author: 'Ольга Морозова',
+    author: 'Раиса Магомадова',
     rating: 5,
     text: 'Наблюдаюсь в PresiDent с 2018 года. За это время ни одного нарекания: всё вовремя, аккуратно, с гарантией.',
     at: minutesAgo(5_000),
@@ -770,7 +770,7 @@ export const channelStates: ChannelState[] = [
 
 export const clinicSettings: ClinicSettings = {
   name: 'Стоматология PresiDent',
-  address: 'Москва, ул. Тверская, 24, стр. 1',
+  address: 'Грозный, пр-т А. Кадырова, 24',
   phone: '+7 495 120-14-14',
   email: 'hello@president-dental.ru',
   workHours: 'Пн–Сб: 09:00–21:00, Вс: 10:00–18:00',

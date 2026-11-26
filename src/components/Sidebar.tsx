@@ -69,6 +69,17 @@ export function Sidebar({ newLeads, unansweredReviews }: SidebarProps) {
         <div className="nav-group-label">Интеграции</div>
         {extraNav.map(renderItem)}
 
+        <div className="nav-group-label">Помощник</div>
+        <button
+          className="nav-item"
+          onClick={() => window.dispatchEvent(new Event('assistant:open'))}
+          title="ИИ-админ"
+        >
+          <Icon name="sparkles" size={18} />
+          <span>ИИ-админ</span>
+          <span className="nav-badge hot">AI</span>
+        </button>
+
         <div className="nav-group-label">Состояние каналов</div>
         <div className="channel-mini">
           <span className="dot live" />
@@ -86,9 +97,9 @@ export function Sidebar({ newLeads, unansweredReviews }: SidebarProps) {
 
       <div className="sidebar-footer">
         <div className="user-card">
-          <Avatar name="Администратор" size={32} color="#14b98f" />
+          <Avatar name="Мадина Ибрагимова" size={32} color="#14b98f" />
           <div style={{ minWidth: 0 }}>
-            <div className="name">Анна Ковалёва</div>
+            <div className="name">Мадина Ибрагимова</div>
             <div className="role">Администратор</div>
           </div>
           <button className="icon-btn" style={{ marginLeft: 'auto', width: 30, height: 30, color: '#8fa8b1' }} aria-label="Выйти">

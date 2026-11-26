@@ -102,7 +102,7 @@ export default function Dashboard() {
     <>
       <div className="page-head">
         <div>
-          <h1 className="page-title">Добрый день, Анна</h1>
+          <h1 className="page-title">Добрый день, Мадина</h1>
           <div className="page-sub">
             {today} · {stats ? `${stats.newLeads} новых обращений сегодня` : 'загружаем данные…'}
           </div>

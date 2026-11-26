@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { Icon } from './Icon'
 import { Avatar } from './ui'
 
-const TITLES: Record<string, string> = {
+export const PAGE_TITLES: Record<string, string> = {
   '/': 'Главная',
   '/leads': 'Заявки',
   '/patients': 'База пациентов',
@@ -20,7 +20,7 @@ export function Topbar({ demoMode, newLeads }: { demoMode: boolean; newLeads: nu
   const inputRef = useRef<HTMLInputElement>(null)
   const [query, setQuery] = useState('')
 
-  const title = TITLES[location.pathname] ?? 'Админ-панель'
+  const title = PAGE_TITLES[location.pathname] ?? 'Админ-панель'
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -71,9 +71,9 @@ export function Topbar({ demoMode, newLeads }: { demoMode: boolean; newLeads: nu
       </button>
 
       <div className="avatar-top">
-        <Avatar name="Анна Ковалёва" size={34} color="#0E9E7B" />
+        <Avatar name="Мадина Ибрагимова" size={34} color="#0E9E7B" />
         <div style={{ lineHeight: 1.25 }}>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>Анна Ковалёва</div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Мадина Ибрагимова</div>
           <div style={{ fontSize: 11.5, color: 'var(--ink-3)' }}>Администратор</div>
         </div>
       </div>

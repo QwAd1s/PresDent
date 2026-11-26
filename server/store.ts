@@ -20,6 +20,7 @@ import {
 } from '../shared/fixtures'
 
 export interface Database {
+  version: number
   leads: Lead[]
   patients: Patient[]
   doctors: Doctor[]
@@ -29,6 +30,9 @@ export interface Database {
   events: ChannelEvent[]
 }
 
+/** Поднимаем, когда меняются демо-данные: старый db.json пересоздастся. */
+const SEED_VERSION = 2
+
 const DATA_DIR = path.join(process.cwd(), 'server', 'data')
 const DB_FILE = path.join(DATA_DIR, 'db.json')
 
@@ -37,6 +41,7 @@ let saveTimer: NodeJS.Timeout | null = null
 
 function seed(): Database {
   return {
+    version: SEED_VERSION,
     leads: structuredClone(seedLeads),
     patients: structuredClone(seedPatients),
     doctors: structuredClone(seedDoctors),
@@ -67,8 +72,16 @@ export function getDb(): Database {
 
   try {
     const raw = fs.readFileSync(DB_FILE, 'utf8')
-    db = JSON.parse(raw) as Database
-    // страховка от старого формата файла
+    const parsed = JSON.parse(raw) as Database
+
+    // данные из старой версии фикстур — пересоздаём
+    if (parsed.version !== SEED_VERSION) {
+      db = seed()
+      saveDb()
+      return db
+    }
+
+    db = parsed
     db.events ??= []
   } catch {
     db = seed()

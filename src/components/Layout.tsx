@@ -4,6 +4,7 @@ import type { Stats } from '../../shared/types'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { connectRealtime, disconnectRealtime, getReviews, getStats, isDemoMode, subscribe } from '../lib/api'
+import { Assistant } from './Assistant'
 
 export interface LayoutContext {
   stats: Stats | null
@@ -57,6 +58,7 @@ export function Layout() {
           <Outlet context={{ stats, refreshStats } satisfies LayoutContext} />
         </main>
       </div>
+      <Assistant />
     </div>
   )
 }

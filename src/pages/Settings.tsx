@@ -5,10 +5,10 @@ import { Icon } from '../components/Icon'
 import { Avatar, Field, SkeletonRows, Toggle } from '../components/ui'
 
 const TEAM = [
-  { name: 'Анна Ковалёва', role: 'Администратор', access: 'Полный доступ', color: '#0E9E7B' },
-  { name: 'Ирина Соколова', role: 'Старший администратор', access: 'Заявки, пациенты, расписание', color: '#2F6FED' },
-  { name: 'Марина Ахмедова', role: 'Врач-терапевт', access: 'Своё расписание и пациенты', color: '#C94B8D' },
-  { name: 'Игорь Ковалёв', role: 'Хирург-имплантолог', access: 'Своё расписание и пациенты', color: '#8A5CF6' },
+  { name: 'Мадина Ибрагимова', role: 'Администратор', access: 'Полный доступ', color: '#0E9E7B' },
+  { name: 'Айшат Батаева', role: 'Старший администратор', access: 'Заявки, пациенты, расписание', color: '#2F6FED' },
+  { name: 'Исмаилова Мадина', role: 'Врач-терапевт', access: 'Своё расписание и пациенты', color: '#C94B8D' },
+  { name: 'Магомадов Турпал', role: 'Хирург-имплантолог', access: 'Своё расписание и пациенты', color: '#8A5CF6' },
 ]
 
 export default function Settings() {

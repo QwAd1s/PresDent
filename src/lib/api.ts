@@ -11,6 +11,7 @@ import type {
   Stats,
 } from '../../shared/types'
 import * as demo from './mock'
+import { assistantReply, type AssistantPending, type AssistantReply } from '../../shared/assistant'
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -57,8 +58,8 @@ export interface LeadsQuery {
 
 export async function getLeads(query: LeadsQuery = {}): Promise<LeadsResponse> {
   const params = new URLSearchParams()
-  if (query.status) params.set('status', query.status)
-  if (query.channel) params.set('channel', query.channel)
+  if (query.status && query.status !== 'all') params.set('status', query.status)
+  if (query.channel && query.channel !== 'all') params.set('channel', query.channel)
   if (query.q) params.set('q', query.q)
   const suffix = params.toString() ? `?${params}` : ''
 
@@ -110,6 +111,54 @@ export async function getDoctors(): Promise<{ items: Doctor[] }> {
 
 export async function getAppointments(): Promise<{ items: Appointment[] }> {
   return (await http<{ items: Appointment[] }>('/api/appointments')) ?? demo.getAppointments()
+}
+
+// ─── ИИ-админ ───────────────────────────────────────────────────────────────
+
+/** Запрос к ИИ-админу: на сервере — движок из shared/assistant.ts, без API → демо. */
+export async function askAssistant(
+  text: string,
+  page: string,
+  pending?: AssistantPending,
+): Promise<AssistantReply> {
+  const live = await http<AssistantReply>('/api/assistant', {
+    method: 'POST',
+    body: JSON.stringify({ text, page, pending }),
+  })
+
+  return live ?? assistantReply({ text, page, pending, data: demo.getAssistantData() })
+}
+
+/** Запись на приём: 409 от сервера = время заняли, пока мы думали. */
+export async function bookAppointment(input: demo.AppointmentInput): Promise<{
+  ok: boolean
+  appointment?: Appointment
+  error?: string
+}> {
+  if (!demoMode) {
+    try {
+      const response = await fetch(`${BASE}/api/appointments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+        signal: AbortSignal.timeout(3_000),
+      })
+
+      if (response.ok) {
+        return { ok: true, appointment: (await response.json()) as Appointment }
+      }
+      if (response.status === 409) {
+        return { ok: false, error: 'Это время только что заняли — выберите другое' }
+      }
+      return { ok: false, error: 'Не удалось создать запись' }
+    } catch {
+      demoMode = true
+      emit('demo')
+    }
+  }
+
+  const result = demo.addAppointment(input)
+  return result.ok ? { ok: true, appointment: result.appointment } : { ok: false, error: result.error }
 }
 
 export interface ReviewsPayload {

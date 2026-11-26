@@ -1,6 +1,7 @@
 import express from 'express'
-import type { Lead, LeadsResponse, LeadStatus, Stats } from '../shared/types'
+import type { Appointment, Lead, LeadsResponse, LeadStatus, Stats } from '../shared/types'
 import { channelStates, series as seedSeries } from '../shared/fixtures'
+import { assistantReply, type AssistantPending } from '../shared/assistant'
 import { addEvent, getDb, newId, saveDb } from './store'
 import { broadcast, addClient, clientsCount } from './realtime'
 import { ingestIncoming } from './ingest'
@@ -114,6 +115,10 @@ router.get('/leads', (req, res) => {
   const { status, channel, q } = req.query as Record<string, string | undefined>
   const search = q?.trim().toLowerCase()
 
+  // «all» — это отсутствие фильтра, а не имя канала
+  const channelFilter = channel && channel !== 'all' ? channel : null
+  const statusFilter = status && status !== 'all' ? status : null
+
   const matchesSearch = (lead: Lead) => {
     if (!search) return true
     return [lead.name, lead.phone, lead.handle, lead.service, lead.messages.at(-1)?.text]
@@ -122,7 +127,7 @@ router.get('/leads', (req, res) => {
   }
 
   const base = db.leads.filter(
-    (lead) => (!channel || lead.channel === channel) && matchesSearch(lead),
+    (lead) => (!channelFilter || lead.channel === channelFilter) && matchesSearch(lead),
   )
 
   const counts = base.reduce(
@@ -135,7 +140,7 @@ router.get('/leads', (req, res) => {
   )
 
   const items = base
-    .filter((lead) => !status || status === 'all' || lead.status === status)
+    .filter((lead) => !statusFilter || lead.status === statusFilter)
     .sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))
 
   const payload: LeadsResponse = { items, counts }
@@ -274,6 +279,107 @@ router.post('/reviews/:id/reply', (req, res) => {
 
 router.get('/appointments', (_req, res) => {
   res.json({ items: getDb().appointments })
+})
+
+/**
+ * Запись на приём — вызывается из «ИИ-админа» и из ручной формы.
+ * Проверяем, что врач существует и что время не занято.
+ */
+router.post('/appointments', (req, res) => {
+  const db = getDb()
+  const { patientName, phone, doctorId, service, start, durationMin, channel } = req.body ?? {}
+
+  if (!patientName || !doctorId || !start) {
+    res.status(400).json({ error: 'Нужны имя пациента, врач и время' })
+    return
+  }
+
+  const doctor = db.doctors.find((item) => item.id === doctorId)
+  if (!doctor) {
+    res.status(404).json({ error: 'Врач не найден' })
+    return
+  }
+
+  const startDate = new Date(start)
+  if (Number.isNaN(startDate.getTime())) {
+    res.status(400).json({ error: 'Некорректное время' })
+    return
+  }
+
+  const duration = Number(durationMin) || 30
+  const endMs = startDate.getTime() + duration * 60_000
+  const conflict = db.appointments.find((appointment) => {
+    const otherStart = new Date(appointment.start).getTime()
+    const otherEnd = otherStart + appointment.durationMin * 60_000
+    return appointment.doctorId === doctorId && startDate.getTime() < otherEnd && otherStart < endMs
+  })
+
+  if (conflict) {
+    res.status(409).json({
+      error: 'Это время уже занято',
+      conflict: { patientName: conflict.patientName, start: conflict.start },
+    })
+    return
+  }
+
+  const appointment: Appointment = {
+    id: newId('ap'),
+    patientName: String(patientName),
+    phone: String(phone ?? ''),
+    doctorId,
+    service: String(service ?? 'Консультация'),
+    start: startDate.toISOString(),
+    durationMin: duration,
+    status: 'confirmed',
+    channel: (channel ?? 'phone') as Appointment['channel'],
+  }
+
+  db.appointments.push(appointment)
+
+  // если по этому пациенту висит заявка — переводим её в «Записан»
+  const lead = db.leads.find(
+    (item) =>
+      (phone && item.phone === phone) ||
+      item.name.toLowerCase() === String(patientName).toLowerCase(),
+  )
+  if (lead && lead.status !== 'closed') {
+    lead.status = 'booked'
+    lead.updatedAt = new Date().toISOString()
+    lead.note = `${lead.note ? `${lead.note} ` : ''}Запись ${startDate.toLocaleString('ru-RU')} к ${doctor.name}`
+    broadcast('lead:update', lead)
+  }
+
+  saveDb()
+  broadcast('appointment:new', appointment)
+  res.status(201).json(appointment)
+})
+
+/**
+ * ИИ-админ. Локальный движок: понимает фразу, смотрит расписание и готовит запись.
+ * Внешняя LLM сюда подключается позже — интерфейс запроса/ответа уже готов.
+ */
+router.post('/assistant', (req, res) => {
+  const db = getDb()
+  const { text, page, pending } = req.body ?? {}
+
+  if (!text || typeof text !== 'string') {
+    res.status(400).json({ error: 'Пустой запрос' })
+    return
+  }
+
+  const reply = assistantReply({
+    text,
+    page,
+    pending: pending as AssistantPending | undefined,
+    data: {
+      doctors: db.doctors,
+      appointments: db.appointments,
+      patients: db.patients,
+      leads: db.leads,
+    },
+  })
+
+  res.json(reply)
 })
 
 // ─── Каналы и вебхуки ───────────────────────────────────────────────────────

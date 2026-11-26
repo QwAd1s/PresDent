@@ -278,6 +278,7 @@ export function getChannels() {
 
 export const getEventsLog = () => ({ items: events })
 export const getSettings = () => settings
+
 export const saveSettings = (patch: Partial<ClinicSettings>) => {
   settings = { ...settings, ...patch }
   return settings
@@ -345,3 +346,62 @@ export const countByStatus = () =>
     },
     { new: 0, in_progress: 0, booked: 0, closed: 0, spam: 0 },
   )
+
+// ─── ИИ-админ и запись на приём (демо-режим) ────────────────────────────────
+
+export const getAssistantData = () => ({
+  doctors,
+  appointments,
+  patients,
+  leads,
+})
+
+export interface AppointmentInput {
+  patientName: string
+  phone?: string
+  doctorId: string
+  service: string
+  start: string
+  durationMin: number
+  channel?: Channel
+}
+
+export function addAppointment(
+  input: AppointmentInput,
+): { ok: true; appointment: Appointment } | { ok: false; error: string } {
+  const startDate = new Date(input.start)
+  const duration = input.durationMin || 30
+
+  const conflict = appointments.find((appointment) => {
+    if (appointment.doctorId !== input.doctorId) return false
+    const otherStart = new Date(appointment.start).getTime()
+    const otherEnd = otherStart + appointment.durationMin * 60_000
+    return startDate.getTime() < otherEnd && otherStart < startDate.getTime() + duration * 60_000
+  })
+
+  if (conflict) return { ok: false, error: 'Это время уже занято' }
+
+  const appointment: Appointment = {
+    id: uid('ap'),
+    patientName: input.patientName,
+    phone: input.phone ?? '',
+    doctorId: input.doctorId,
+    service: input.service,
+    start: startDate.toISOString(),
+    durationMin: duration,
+    status: 'confirmed',
+    channel: input.channel ?? 'phone',
+  }
+
+  appointments.push(appointment)
+
+  const lead = leads.find(
+    (item) => item.phone === input.phone || item.name.toLowerCase() === input.patientName.toLowerCase(),
+  )
+  if (lead && lead.status !== 'closed') {
+    lead.status = 'booked'
+    lead.updatedAt = new Date().toISOString()
+  }
+
+  return { ok: true, appointment }
+}
