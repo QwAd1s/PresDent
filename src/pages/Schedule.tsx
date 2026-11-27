@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import type { Appointment, Doctor, Patient } from '../../shared/types'
 import type { SlotOffer } from '../../shared/slots'
@@ -7,28 +7,17 @@ import {
   getAppointments,
   getDoctors,
   getPatients,
+  getServices,
   getSlots,
   rescheduleAppointment,
   updateAppointment,
   type SlotsPayload,
 } from '../lib/api'
-import { SERVICES, findService, formatPrice, serviceDuration } from '../../shared/services'
-import { formatTime, weekday } from '../lib/format'
+import { formatPrice } from '../../shared/services'
+import type { Service } from '../../shared/services'
+import { formatTime, plural } from '../lib/format'
 import { Icon } from '../components/Icon'
-import { Avatar, ChannelTag, Field, Modal, SkeletonRows } from '../components/ui'
-
-const START_HOUR = 9
-const END_HOUR = 21
-const ROW = 64
-const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, index) => START_HOUR + index)
-
-const startOfWeek = (offset: number) => {
-  const date = new Date()
-  date.setHours(0, 0, 0, 0)
-  const shift = (date.getDay() + 6) % 7
-  date.setDate(date.getDate() - shift + offset * 7)
-  return date
-}
+import { Avatar, ChannelTag, EmptyState, Field, Modal, SkeletonRows } from '../components/ui'
 
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString()
 const toDateInput = (date: Date) =>
@@ -55,26 +44,30 @@ type ModalState =
 
 export default function Schedule() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [offset, setOffset] = useState(0)
+  const [date, setDate] = useState(toDateInput(new Date()))
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [patients, setPatients] = useState<Patient[]>([])
+  const [services, setServices] = useState<Service[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Appointment | null>(null)
   const [modal, setModal] = useState<ModalState | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [doctorFilter, setDoctorFilter] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const [appointmentsPayload, doctorsPayload, patientsPayload] = await Promise.all([
+    const [appointmentsPayload, doctorsPayload, patientsPayload, servicesPayload] = await Promise.all([
       getAppointments(),
       getDoctors(),
       getPatients(),
+      getServices(),
     ])
     setAppointments(appointmentsPayload.items)
     setDoctors(doctorsPayload.items)
     setPatients(patientsPayload.items)
+    setServices(servicesPayload.items)
     setLoading(false)
   }, [])
 
@@ -96,33 +89,35 @@ export default function Schedule() {
     setSearchParams({}, { replace: true })
   }, [searchParams, setSearchParams])
 
+  // Переход «Профиль» из карточки врача: показываем только его приёмы
+  useEffect(() => {
+    const doctorParam = searchParams.get('doctor')
+    if (!doctorParam) return
+    setDoctorFilter(doctorParam)
+    setSearchParams({}, { replace: true })
+  }, [searchParams, setSearchParams])
+
   useEffect(() => {
     if (!toast) return
     const timer = setTimeout(() => setToast(null), 4000)
     return () => clearTimeout(timer)
   }, [toast])
 
-  const monday = useMemo(() => startOfWeek(offset), [offset])
-  const days = useMemo(
-    () =>
-      Array.from({ length: 6 }, (_, index) => {
-        const date = new Date(monday)
-        date.setDate(monday.getDate() + index)
-        return date
-      }),
-    [monday],
-  )
+  const dayDate = new Date(`${date}T00:00:00`)
+  const dayLabel = dayDate.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })
 
-  const weekLabel = `${days[0].getDate()} — ${days[5].getDate()} ${days[5].toLocaleDateString('ru-RU', { month: 'long' })}`
   const doctorOf = (id: string) => doctors.find((doctor) => doctor.id === id)
-  const todayIndex = days.findIndex((day) => sameDay(day, new Date()))
 
-  const nowLeft = useMemo(() => {
-    const now = new Date()
-    const hours = now.getHours() + now.getMinutes() / 60
-    if (hours < START_HOUR || hours > END_HOUR) return null
-    return (hours - START_HOUR) * ROW
-  }, [])
+  const dayAppointments = appointments
+    .filter((appointment) => sameDay(new Date(appointment.start), dayDate))
+    .filter((appointment) => (doctorFilter ? appointment.doctorId === doctorFilter : true))
+    .sort((a, b) => +new Date(a.start) - +new Date(b.start))
+
+  const shiftDate = (days: number) => {
+    const next = new Date(dayDate)
+    next.setDate(next.getDate() + days)
+    setDate(toDateInput(next))
+  }
 
   const changeStatus = async (appointment: Appointment, status: Appointment['status']) => {
     setBusy(true)
@@ -143,20 +138,29 @@ export default function Schedule() {
       <div className="page-head">
         <div>
           <h1 className="page-title">Расписание</h1>
-          <div className="page-sub">Неделя {weekLabel} · приёмы всех врачей, перенос и отмена</div>
+          <div className="page-sub">
+            {dayLabel} · {dayAppointments.length} {plural(dayAppointments.length, ['приём', 'приёма', 'приёмов'])}
+          </div>
         </div>
         <div className="page-actions">
           <div style={{ display: 'flex', gap: 6 }}>
-            <button className="btn btn-ghost btn-sm" onClick={() => setOffset(offset - 1)} aria-label="Предыдущая неделя">
+            <button className="btn btn-ghost btn-sm" onClick={() => shiftDate(-1)} aria-label="Предыдущий день">
               <Icon name="chevronRight" size={15} style={{ transform: 'rotate(180deg)' }} />
             </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setOffset(0)}>
+            <button className="btn btn-ghost btn-sm" onClick={() => setDate(toDateInput(new Date()))}>
               Сегодня
             </button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setOffset(offset + 1)} aria-label="Следующая неделя">
+            <button className="btn btn-ghost btn-sm" onClick={() => shiftDate(1)} aria-label="Следующий день">
               <Icon name="chevronRight" size={15} />
             </button>
           </div>
+          <input
+            type="date"
+            className="input"
+            value={date}
+            onChange={(event) => setDate(event.target.value)}
+            style={{ width: 158 }}
+          />
           <button className="btn btn-primary" onClick={() => setModal({ mode: 'create' })}>
             <Icon name="plus" size={16} />
             Записать пациента
@@ -174,132 +178,89 @@ export default function Schedule() {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14, alignItems: 'center' }}>
+        <button
+          className={`pill ${doctorFilter === null ? 'active' : ''}`}
+          onClick={() => setDoctorFilter(null)}
+          type="button"
+        >
+          Все врачи
+        </button>
         {doctors.map((doctor) => (
-          <span key={doctor.id} className="pill">
+          <button
+            key={doctor.id}
+            type="button"
+            className={`pill ${doctorFilter === doctor.id ? 'active' : ''}`}
+            onClick={() => setDoctorFilter(doctorFilter === doctor.id ? null : doctor.id)}
+          >
             <span style={{ width: 7, height: 7, borderRadius: 99, background: doctor.color }} />
             {doctor.name.split(' ').slice(0, 2).join(' ')}
-          </span>
+          </button>
         ))}
         <span className="muted" style={{ marginLeft: 'auto', fontSize: 12 }}>
-          Клик по приёму — статус, перенос, отмена
+          {doctorFilter ? 'Показан один врач · нажмите ещё раз, чтобы сбросить' : 'Клик по приёму — статус, перенос, отмена'}
         </span>
       </div>
 
-      <section className="card" style={{ overflow: 'hidden' }}>
+      <section className="card">
         {loading ? (
-          <SkeletonRows rows={8} />
-        ) : (
-          <div className="schedule-wrap">
-            <div style={{ minWidth: 860 }}>
-              <div className="schedule-head">
-                <div className="schedule-head-cell" />
-                {days.map((day, index) => (
-                  <div key={day.toISOString()} className={`schedule-head-cell ${index === todayIndex ? 'today' : ''}`}>
-                    {weekday(day)}
-                    <small>
-                      {day.getDate()} {day.toLocaleDateString('ru-RU', { month: 'short' })}
-                    </small>
-                  </div>
-                ))}
-              </div>
+          <SkeletonRows rows={6} />
+        ) : dayAppointments.length ? (
+          <div className="day-list">
+            {dayAppointments.map((appointment) => {
+              const doctor = doctorOf(appointment.doctorId)
+              const end = new Date(new Date(appointment.start).getTime() + appointment.durationMin * 60_000)
+              const cancelled = appointment.status === 'cancelled'
+              const tone = STATUS_STYLE[appointment.status]
 
-              <div className="schedule">
-                <div>
-                  {HOURS.map((hour) => (
-                    <div className="schedule-hour" key={hour}>
-                      {String(hour).padStart(2, '0')}:00
-                    </div>
-                  ))}
-                </div>
+              return (
+                <button
+                  key={appointment.id}
+                  type="button"
+                  className="day-row"
+                  onClick={() => {
+                    setSelected(appointment)
+                    setConfirmCancel(false)
+                  }}
+                  style={cancelled ? { opacity: 0.6 } : undefined}
+                >
+                  <span className="day-time">
+                    {formatTime(appointment.start)}–{formatTime(end.toISOString())}
+                  </span>
 
-                {days.map((day, dayIndex) => (
-                  <div className="schedule-col" key={day.toISOString()}>
-                    {HOURS.map((hour) => (
-                      <div className="schedule-cell" key={hour} />
-                    ))}
+                  <span className="day-patient">
+                    <b style={cancelled ? { textDecoration: 'line-through' } : undefined}>
+                      {appointment.patientName}
+                    </b>
+                    <small>{appointment.phone || 'без телефона'}</small>
+                  </span>
 
-                    {dayIndex === todayIndex && nowLeft !== null && (
-                      <div
-                        style={{
-                          position: 'absolute',
-                          left: 0,
-                          right: 0,
-                          top: nowLeft,
-                          height: 2,
-                          background: '#DD5157',
-                          zIndex: 3,
-                        }}
-                      >
-                        <span
-                          style={{
-                            position: 'absolute',
-                            left: 2,
-                            top: -6,
-                            width: 8,
-                            height: 8,
-                            borderRadius: 99,
-                            background: '#DD5157',
-                          }}
-                        />
-                      </div>
-                    )}
+                  <span className="day-doctor">
+                    <i style={{ background: doctor?.color ?? '#0E9E7B' }} />
+                    {doctor?.name.split(' ').slice(0, 2).join(' ') ?? '—'}
+                  </span>
 
-                    {appointments
-                      .filter((appointment) => sameDay(new Date(appointment.start), day))
-                      .filter((appointment) => {
-                        const date = new Date(appointment.start)
-                        const hours = date.getHours() + date.getMinutes() / 60
-                        return hours >= START_HOUR && hours < END_HOUR
-                      })
-                      .map((appointment) => {
-                        const date = new Date(appointment.start)
-                        const doctor = doctorOf(appointment.doctorId)
-                        const top = (date.getHours() + date.getMinutes() / 60 - START_HOUR) * ROW
-                        const height = Math.max((appointment.durationMin / 60) * ROW - 4, 34)
-                        const color = doctor?.color ?? '#0E9E7B'
-                        const cancelled = appointment.status === 'cancelled'
-                        const done = appointment.status === 'done'
+                  <span className="day-service">{appointment.service}</span>
 
-                        return (
-                          <div
-                            key={appointment.id}
-                            className="appt"
-                            onClick={() => {
-                              setSelected(appointment)
-                              setConfirmCancel(false)
-                            }}
-                            style={{
-                              top,
-                              height,
-                              background: cancelled ? '#f6f8f9' : `${color}14`,
-                              borderLeftColor: cancelled ? '#c3ced4' : color,
-                              opacity: done || cancelled ? 0.68 : 1,
-                              borderTop: `1px solid ${color}22`,
-                              borderRight: `1px solid ${color}22`,
-                              borderBottom: `1px solid ${color}22`,
-                              textDecoration: cancelled ? 'line-through' : 'none',
-                            }}
-                            title={`${appointment.patientName} · ${appointment.service}`}
-                          >
-                            <b>{appointment.patientName}</b>
-                            <span>
-                              {formatTime(appointment.start)} · {appointment.service}
-                            </span>
-                            {height > 56 && <span>{doctor?.name.split(' ').slice(0, 2).join(' ')}</span>}
-                            {height > 78 && (
-                              <span style={{ color: STATUS_STYLE[appointment.status].color }}>
-                                {STATUS_LABEL[appointment.status]}
-                              </span>
-                            )}
-                          </div>
-                        )
-                      })}
-                  </div>
-                ))}
-              </div>
-            </div>
+                  <span className="badge" style={{ background: tone.bg, color: tone.color }}>
+                    {STATUS_LABEL[appointment.status]}
+                  </span>
+
+                  <Icon name="chevronRight" size={15} style={{ color: 'var(--ink-3)' }} />
+                </button>
+              )
+            })}
           </div>
+        ) : (
+          <EmptyState
+            title="На этот день приёмов нет"
+            text={
+              doctorFilter
+                ? 'У выбранного врача на эту дату записей нет — снимите фильтр или выберите другой день.'
+                : 'Запишите пациента — приём сразу появится в этом списке.'
+            }
+            icon="calendar"
+          />
         )}
       </section>
 
@@ -349,7 +310,9 @@ export default function Schedule() {
               {STATUS_LABEL[selected.status]}
             </span>
             <ChannelTag channel={selected.channel} />
-            {findService(selected.service) && <span className="pill">{formatPrice(findService(selected.service)!.price)}</span>}
+            {services.find((item) => item.title === selected.service) && (
+        <span className="pill">{formatPrice(services.find((item) => item.title === selected.service)!.price)}</span>
+      )}
           </div>
 
           <div className="kv">
@@ -413,6 +376,7 @@ export default function Schedule() {
           initial={modal.mode === 'create' ? modal.prefill : undefined}
           doctors={doctors}
           patients={patients}
+          services={services}
           onClose={() => {
             setModal(null)
             setSelected(null)
@@ -437,15 +401,17 @@ interface BookingModalProps {
   initial?: BookingPrefill
   doctors: Doctor[]
   patients: Patient[]
+  services: Service[]
   onClose: () => void
   onDone: (message: string) => void | Promise<void>
 }
 
-function BookingModal({ mode, appointment, initial, doctors, patients, onClose, onDone }: BookingModalProps) {
+function BookingModal({ mode, appointment, initial, doctors, patients, services, onClose, onDone }: BookingModalProps) {
+  const activeServices = services.filter((item) => item.active !== false)
   const isReschedule = mode === 'reschedule'
 
-  const initialService = appointment?.service ?? initial?.service ?? 'Консультация'
-  const initialSpecialty = findService(initialService)?.specialty ?? ''
+  const initialService = appointment?.service ?? initial?.service ?? activeServices[0]?.title ?? 'Консультация'
+  const initialSpecialty = services.find((item) => item.title === initialService)?.specialty ?? ''
   const initialDoctor =
     doctors.find((doctor) => doctor.specialty.toLowerCase().includes(initialSpecialty))?.id ?? doctors[0]?.id ?? ''
 
@@ -463,8 +429,9 @@ function BookingModal({ mode, appointment, initial, doctors, patients, onClose, 
   const [busy, setBusy] = useState(false)
   const requestRef = useRef(0)
 
-  const duration = appointment?.durationMin ?? serviceDuration(service)
-  const price = findService(service)?.price
+  const serviceInfo = services.find((item) => item.title === service)
+  const duration = appointment?.durationMin ?? serviceInfo?.durationMin ?? 60
+  const price = serviceInfo?.price
 
   const loadSlots = useCallback(async () => {
     if (!doctorId || !date) return
@@ -487,7 +454,7 @@ function BookingModal({ mode, appointment, initial, doctors, patients, onClose, 
   }, [loadSlots])
 
   const pickDoctorForService = (nextService: string) => {
-    const target = findService(nextService)
+    const target = services.find((item) => item.title === nextService)
     if (!target) return
     const match = doctors.find((doctor) => doctor.specialty.toLowerCase().includes(target.specialty))
     if (match) setDoctorId(match.id)
@@ -591,12 +558,12 @@ function BookingModal({ mode, appointment, initial, doctors, patients, onClose, 
                 pickDoctorForService(event.target.value)
               }}
             >
-              {SERVICES.map((item) => (
+              {activeServices.map((item) => (
                 <option key={item.id} value={item.title}>
                   {item.title} — {formatPrice(item.price)}
                 </option>
               ))}
-              {!findService(service) && <option value={service}>{service}</option>}
+              {!serviceInfo && service && <option value={service}>{service}</option>}
             </select>
           </Field>
           <Field label="Врач">

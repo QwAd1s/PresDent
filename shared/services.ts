@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Справочник услуг клиники: цена, длительность и специализация врача.
  * Один источник правды для админки, ИИ-админа и (в будущем) кабинета пациента.
  */
@@ -12,6 +12,8 @@ export interface Service {
   /** Ключевое слово специальности врача, который выполняет услугу */
   specialty: string
   description?: string
+  /** Скрытая услуга не показывается на сайте и в записи */
+  active?: boolean
 }
 
 export const SERVICES: Service[] = [
@@ -117,6 +119,13 @@ export const SERVICES: Service[] = [
 ]
 
 export const SERVICE_TITLES = SERVICES.map((service) => service.title)
+
+/** Поиск в конкретном каталоге (из базы), а не в статическом списке. */
+export const findServiceIn = (services: Service[], title?: string | null): Service | undefined =>
+  title ? services.find((service) => service.title === title) : undefined
+
+export const serviceDurationIn = (services: Service[], title?: string | null): number =>
+  findServiceIn(services, title)?.durationMin ?? 60
 
 export const CATEGORIES = Array.from(new Set(SERVICES.map((service) => service.category)))
 

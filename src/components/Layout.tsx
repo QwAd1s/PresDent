@@ -50,9 +50,9 @@ export function Layout() {
 
   return (
     <div className="app">
-      <Sidebar newLeads={stats?.newLeads ?? 0} unansweredReviews={unanswered} />
+      <Sidebar newLeads={stats?.unprocessedLeads ?? 0} unansweredReviews={unanswered} />
       <div className="main">
-        <Topbar demoMode={demoMode} newLeads={stats?.newLeads ?? 0} />
+        <Topbar demoMode={demoMode} newLeads={stats?.unprocessedLeads ?? 0} />
         <main className="content">
           <Outlet context={{ stats, refreshStats } satisfies LayoutContext} />
         </main>

@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { Doctor, Patient } from '../../shared/types'
-import { getDoctors, getPatients } from '../lib/api'
+import { createPatient, getDoctors, getPatients } from '../lib/api'
 import { formatDate, money, plural, relativeTime } from '../lib/format'
 import { Icon } from '../components/Icon'
-import { Avatar, EmptyState, Modal, SkeletonRows } from '../components/ui'
+import { Avatar, EmptyState, Field, Modal, SkeletonRows } from '../components/ui'
 
 export default function Patients() {
+  const navigate = useNavigate()
   const [patients, setPatients] = useState<Patient[]>([])
   const [doctors, setDoctors] = useState<Doctor[]>([])
   const [total, setTotal] = useState(0)
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Patient | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     void getDoctors().then((payload) => setDoctors(payload.items))
@@ -32,7 +36,7 @@ export default function Patients() {
       alive = false
       clearTimeout(timer)
     }
-  }, [query])
+  }, [query, reloadKey])
 
   const doctorName = (id?: string) => doctors.find((doctor) => doctor.id === id)?.name ?? '—'
   const doctorColor = (id?: string) => doctors.find((doctor) => doctor.id === id)?.color ?? '#0E9E7B'
@@ -68,7 +72,7 @@ export default function Patients() {
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
-          <button className="btn btn-primary">
+          <button className="btn btn-primary" onClick={() => setCreating(true)}>
             <Icon name="plus" size={16} />
             Добавить пациента
           </button>
@@ -187,6 +191,17 @@ export default function Patients() {
         )}
       </section>
 
+      {creating && (
+        <CreatePatientModal
+          doctors={doctors}
+          onClose={() => setCreating(false)}
+          onCreated={() => {
+            setCreating(false)
+            setReloadKey((value) => value + 1)
+          }}
+        />
+      )}
+
       {selected && (
         <Modal
           title={selected.name}
@@ -197,7 +212,14 @@ export default function Patients() {
               <button className="btn btn-ghost" onClick={() => setSelected(null)}>
                 Закрыть
               </button>
-              <button className="btn btn-primary">
+              <button
+                className="btn btn-primary"
+                onClick={() =>
+                  navigate(
+                    `/schedule?book=1&name=${encodeURIComponent(selected.name)}&phone=${encodeURIComponent(selected.phone)}&service=${encodeURIComponent('Консультация')}`,
+                  )
+                }
+              >
                 <Icon name="calendar" size={15} />
                 Записать на приём
               </button>
@@ -247,5 +269,120 @@ export default function Patients() {
         </Modal>
       )}
     </>
+  )
+}
+
+
+function CreatePatientModal({
+  doctors,
+  onClose,
+  onCreated,
+}: {
+  doctors: Doctor[]
+  onClose: () => void
+  onCreated: () => void
+}) {
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [birthDate, setBirthDate] = useState('')
+  const [doctorId, setDoctorId] = useState('')
+  const [tags, setTags] = useState('')
+  const [notes, setNotes] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const submit = async () => {
+    if (busy) return
+    if (name.trim().length < 2) {
+      setError('Укажите имя пациента')
+      return
+    }
+    if (phone.replace(/\D/g, '').length < 10) {
+      setError('Укажите телефон в формате +7 900 000-00-00')
+      return
+    }
+
+    setBusy(true)
+    setError(null)
+    const result = await createPatient({
+      name: name.trim(),
+      phone: phone.trim(),
+      birthDate: birthDate || undefined,
+      doctorId: doctorId || undefined,
+      tags: tags
+        .split(',')
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+      notes: notes.trim() || undefined,
+    })
+    setBusy(false)
+
+    if (!result.ok) {
+      setError(result.error ?? 'Не удалось добавить пациента')
+      return
+    }
+    onCreated()
+  }
+
+  return (
+    <Modal
+      title="Новый пациент"
+      subtitle="Карточка появится в базе сразу"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose}>
+            Отмена
+          </button>
+          <button className="btn btn-primary" disabled={busy} onClick={() => void submit()}>
+            <Icon name="plus" size={15} />
+            {busy ? 'Сохраняем…' : 'Добавить'}
+          </button>
+        </>
+      }
+    >
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Field label="Имя и фамилия">
+          <input className="input" value={name} onChange={(event) => setName(event.target.value)} placeholder="Мадина Тасуева" />
+        </Field>
+        <Field label="Телефон">
+          <input className="input" value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+7 900 000-00-00" />
+        </Field>
+        <Field label="Дата рождения">
+          <input className="input" type="date" value={birthDate} onChange={(event) => setBirthDate(event.target.value)} />
+        </Field>
+        <Field label="Лечащий врач">
+          <select className="select" value={doctorId} onChange={(event) => setDoctorId(event.target.value)}>
+            <option value="">Не назначен</option>
+            {doctors.map((doctor) => (
+              <option key={doctor.id} value={doctor.id}>
+                {doctor.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      <Field label="Теги" hint="Через запятую: Имплантация, VIP">
+        <input className="input" value={tags} onChange={(event) => setTags(event.target.value)} placeholder="Новый пациент" />
+      </Field>
+
+      <Field label="Заметка">
+        <textarea
+          className="input"
+          rows={3}
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+          placeholder="Аллергии, особенности, пожелания"
+        />
+      </Field>
+
+      {error && (
+        <div className="hint-box warn">
+          <Icon name="alert" size={15} />
+          <div>{error}</div>
+        </div>
+      )}
+    </Modal>
   )
 }

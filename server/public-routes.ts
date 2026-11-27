@@ -1,8 +1,9 @@
-import express from 'express'
+﻿import express from 'express'
 import type { Appointment, Lead, Patient } from '../shared/types'
-import { SERVICES, findService } from '../shared/services'
+import { findServiceIn } from '../shared/services'
 import { availableSlots, dateWithWeekday } from '../shared/slots'
 import { patientAssistantReply } from '../shared/patient-assistant'
+import { doctorMetrics } from '../shared/stats'
 import { addEvent, getDb, newId, saveDb } from './store'
 import { recordAudit } from './audit'
 import { broadcast } from './realtime'
@@ -46,17 +47,20 @@ publicRouter.get('/clinic', (_req, res) => {
       email: db.settings.email,
       workHours: db.settings.workHours,
     },
-    services: SERVICES,
-    doctors: db.doctors.map((doctor) => ({
-      id: doctor.id,
-      name: doctor.name,
-      specialty: doctor.specialty,
-      color: doctor.color,
-      rating: doctor.rating,
-      reviewsCount: doctor.reviewsCount,
-      experienceYears: doctor.experienceYears,
-      workingDays: doctor.workingDays,
-    })),
+    services: db.services.filter((service) => service.active !== false),
+    doctors: db.doctors.map((doctor) => {
+      const metrics = doctorMetrics(doctor, db.appointments, db.reviews)
+      return {
+        id: doctor.id,
+        name: doctor.name,
+        specialty: doctor.specialty,
+        color: doctor.color,
+        rating: metrics.rating,
+        reviewsCount: metrics.reviewsCount,
+        experienceYears: doctor.experienceYears,
+        workingDays: doctor.workingDays,
+      }
+    }),
     trust: {
       doctors: db.doctors.length,
       reviews: db.reviews.length,
@@ -83,7 +87,7 @@ publicRouter.get('/slots', (req, res) => {
     return
   }
 
-  const chosen = findService(service)
+  const chosen = findServiceIn(db.services, service)
   const durationMin = chosen?.durationMin ?? 30
   const result = availableSlots(doctor, parsed, db.appointments, durationMin, chosen?.title ?? 'Консультация', 10)
 
@@ -121,7 +125,12 @@ publicRouter.post('/assistant', (req, res) => {
   const db = getDb()
   const reply = patientAssistantReply({
     text,
-    data: { settings: db.settings, doctors: db.doctors, appointments: db.appointments },
+    data: {
+      settings: db.settings,
+      doctors: db.doctors,
+      appointments: db.appointments,
+      services: db.services.filter((service) => service.active !== false),
+    },
   })
 
   res.json(reply)
@@ -152,7 +161,7 @@ publicRouter.post('/book', (req, res) => {
     return
   }
 
-  const service = findService(serviceTitle)
+  const service = findServiceIn(db.services, serviceTitle)
   if (!service) {
     res.status(400).json({ error: 'Выберите услугу' })
     return

@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import type { Channel, Lead, LeadsResponse, LeadStatus } from '../../shared/types'
 import { CHANNEL_LABEL, STATUS_LABEL } from '../../shared/types'
-import { createLead, getLeads, subscribe } from '../lib/api'
-import { SERVICES, formatPrice } from '../../shared/services'
+import { bulkLeads, createLead, getLeads, getServices, subscribe } from '../lib/api'
+import { formatPrice } from '../../shared/services'
+import type { Service } from '../../shared/services'
 import { relativeTime } from '../lib/format'
 import { Icon } from '../components/Icon'
 import { Avatar, ChannelIcon, EmptyState, Field, Modal, SkeletonRows, StatusBadge } from '../components/ui'
@@ -25,12 +26,18 @@ export default function Leads() {
   const status = params.get('status') ?? 'all'
   const channel = params.get('channel') ?? 'all'
   const query = params.get('q') ?? ''
+  const archived = params.get('archived') === '1'
 
   const [search, setSearch] = useState(query)
   const [data, setData] = useState<LeadsResponse>({ items: [], counts: EMPTY_COUNTS })
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Lead | null>(null)
   const [creating, setCreating] = useState(params.get('new') === '1')
+  const [range, setRange] = useState('all')
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [bulkMessage, setBulkMessage] = useState<string | null>(null)
 
   const patchParams = (patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params)
@@ -41,30 +48,28 @@ export default function Leads() {
     setParams(next, { replace: true })
   }
 
-  useEffect(() => {
-    let alive = true
+  const reload = useCallback(() => {
     setLoading(true)
-
-    getLeads({ status, channel, q: query }).then((payload) => {
-      if (!alive) return
+    setSelectedIds([])
+    return getLeads({ status, channel, q: query, archived }).then((payload) => {
       setData(payload)
       setLoading(false)
     })
+  }, [status, channel, query, archived])
 
-    return () => {
-      alive = false
-    }
-  }, [status, channel, query])
+  useEffect(() => {
+    void reload()
+  }, [reload])
 
   useEffect(() => {
     const unsubscribe = subscribe((type) => {
       if (!type.startsWith('lead')) return
-      void getLeads({ status, channel, q: query }).then(setData)
+      void getLeads({ status, channel, q: query, archived }).then(setData)
     })
     return () => {
       unsubscribe()
     }
-  }, [status, channel, query])
+  }, [status, channel, query, archived])
 
   useEffect(() => {
     // если поиск меняется извне (например, из строки в шапке) — подхватываем
@@ -80,10 +85,67 @@ export default function Leads() {
   }, [search])
 
   const counts = data.counts
+
+  const visibleItems = useMemo(() => {
+    const days = range === 'today' ? 1 : range === '7' ? 7 : range === '30' ? 30 : 0
+    if (!days) return data.items
+    const from = Date.now() - days * 86_400_000
+    return data.items.filter((lead) => new Date(lead.createdAt).getTime() >= from)
+  }, [data.items, range])
+
   const totalHint = useMemo(() => {
-    if (!data.items.length) return 'Ничего не найдено'
-    return `${data.items.length} ${data.items.length === 1 ? 'обращение' : 'обращений'}`
-  }, [data.items.length])
+    if (!visibleItems.length) return 'Ничего не найдено'
+    const base = `${visibleItems.length} ${visibleItems.length === 1 ? 'обращение' : 'обращений'}`
+    return range === 'all' ? base : `${base} за выбранный период`
+  }, [visibleItems.length, range])
+
+  const allSelected = visibleItems.length > 0 && visibleItems.every((lead) => selectedIds.includes(lead.id))
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]))
+
+  const toggleAll = () => setSelectedIds(allSelected ? [] : visibleItems.map((lead) => lead.id))
+
+  const runBulk = async (action: 'archive' | 'restore' | 'delete' | 'status', nextStatus?: LeadStatus) => {
+    if (bulkBusy || !selectedIds.length) return
+    setBulkBusy(true)
+    setBulkMessage(null)
+    const result = await bulkLeads(selectedIds, action, nextStatus)
+    setBulkBusy(false)
+    setConfirmDelete(false)
+
+    if (!result.ok) {
+      setBulkMessage(result.error ?? 'Не удалось выполнить действие')
+      return
+    }
+
+    setBulkMessage(`Готово: ${result.affected ?? selectedIds.length}`)
+    await reload()
+  }
+
+  const exportCsv = () => {
+    const header = ['Дата', 'Клиент', 'Телефон', 'Канал', 'Услуга', 'Статус', 'Последнее сообщение']
+    const rows = visibleItems.map((lead) => [
+      new Date(lead.createdAt).toLocaleString('ru-RU'),
+      lead.name,
+      lead.phone ?? lead.handle ?? '',
+      CHANNEL_LABEL[lead.channel],
+      lead.service ?? '',
+      STATUS_LABEL[lead.status],
+      lead.messages.at(-1)?.text ?? '',
+    ])
+    const csv = [header, ...rows]
+      .map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(';'))
+      .join('\n')
+
+    const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `president-leads-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   const handleChanged = (updated: Lead) => {
     setSelected(updated)
@@ -105,9 +167,17 @@ export default function Leads() {
         </div>
         <div className="page-actions">
           <button
-            className="btn btn-ghost"
-            onClick={() => void getLeads({ status, channel, q: query }).then(setData)}
+            className={`btn ${archived ? 'btn-soft' : 'btn-ghost'}`}
+            onClick={() => patchParams({ archived: archived ? null : '1', status: null })}
           >
+            <Icon name={archived ? 'inbox' : 'filter'} size={15} />
+            {archived ? 'К активным' : 'Архив'}
+          </button>
+          <button className="btn btn-ghost" onClick={exportCsv} disabled={!visibleItems.length}>
+            <Icon name="card" size={15} />
+            Экспорт CSV
+          </button>
+          <button className="btn btn-ghost" onClick={() => void reload()}>
             <Icon name="refresh" size={15} />
             Обновить
           </button>
@@ -134,7 +204,14 @@ export default function Leads() {
           </div>
 
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-            <div className="search" style={{ width: 230, margin: 0 }}>
+            <select className="select" value={range} onChange={(event) => setRange(event.target.value)}>
+              <option value="all">Все время</option>
+              <option value="today">Сегодня</option>
+              <option value="7">7 дней</option>
+              <option value="30">30 дней</option>
+            </select>
+
+            <div className="search" style={{ width: 210, margin: 0 }}>
               <Icon name="search" size={15} />
               <input placeholder="Имя, телефон, текст" value={search} onChange={(event) => setSearch(event.target.value)} />
             </div>
@@ -149,14 +226,78 @@ export default function Leads() {
           </div>
         </div>
 
+        {selectedIds.length > 0 && (
+          <div className="bulk-bar">
+            <span className="bulk-count">
+              Выбрано: {selectedIds.length}
+            </span>
+
+            {archived ? (
+              <button className="btn btn-ghost btn-sm" disabled={bulkBusy} onClick={() => void runBulk('restore')}>
+                <Icon name="refresh" size={14} />
+                Вернуть из архива
+              </button>
+            ) : (
+              <>
+                <button className="btn btn-soft btn-sm" disabled={bulkBusy} onClick={() => void runBulk('archive')}>
+                  <Icon name="inbox" size={14} />
+                  В архив
+                </button>
+                <button className="btn btn-ghost btn-sm" disabled={bulkBusy} onClick={() => void runBulk('status', 'in_progress')}>
+                  <Icon name="clock" size={14} />
+                  В работу
+                </button>
+              </>
+            )}
+
+            {confirmDelete ? (
+              <>
+                <span className="muted" style={{ fontSize: 12 }}>
+                  Удалить безвозвратно?
+                </span>
+                <button className="btn btn-danger btn-sm" disabled={bulkBusy} onClick={() => void runBulk('delete')}>
+                  Да, удалить
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setConfirmDelete(false)}>
+                  Отмена
+                </button>
+              </>
+            ) : (
+              <button className="btn btn-danger btn-sm" disabled={bulkBusy} onClick={() => setConfirmDelete(true)}>
+                <Icon name="x" size={14} />
+                Удалить
+              </button>
+            )}
+
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ marginLeft: 'auto' }}
+              onClick={() => {
+                setSelectedIds([])
+                setConfirmDelete(false)
+                setBulkMessage(null)
+              }}
+            >
+              Снять выбор
+            </button>
+          </div>
+        )}
+
+        {bulkMessage && (
+          <div className="toolbar" style={{ borderBottom: 'none' }}>
+            <span className="muted" style={{ fontSize: 12.5 }}>{bulkMessage}</span>
+          </div>
+        )}
+
         {loading ? (
           <SkeletonRows rows={6} />
-        ) : data.items.length ? (
+        ) : visibleItems.length ? (
           <>
             <div className="table-wrap">
               <table className="data">
                 <thead>
                   <tr>
+                    <th style={{ width: 36 }}><input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Выбрать все" /></th>
                     <th>Клиент</th>
                     <th>Канал</th>
                     <th>Услуга</th>
@@ -167,10 +308,22 @@ export default function Leads() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.items.map((lead) => {
+                  {visibleItems.map((lead) => {
                     const last = lead.messages.at(-1)
                     return (
-                      <tr key={lead.id} onClick={() => setSelected(lead)}>
+                      <tr
+                        key={lead.id}
+                        onClick={() => setSelected(lead)}
+                        style={lead.archived ? { opacity: 0.62 } : undefined}
+                      >
+                        <td onClick={(event) => event.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(lead.id)}
+                            onChange={() => toggleSelect(lead.id)}
+                            aria-label={`Выбрать ${lead.name}`}
+                          />
+                        </td>
                         <td style={{ width: 230 }}>
                           <div className="cell-name">
                             <Avatar name={lead.name} size={34} />
@@ -238,8 +391,12 @@ export default function Leads() {
           </>
         ) : (
           <EmptyState
-            title="Заявок нет"
-            text="Как только клиент напишет в WhatsApp или Instagram, обращение появится здесь автоматически."
+            title={archived ? "Архив пуст" : "Заявок нет"}
+            text={
+              archived
+                ? "Сюда попадают обработанные заявки, которые вы убрали из работы."
+                : "Как только клиент напишет в WhatsApp или Instagram, обращение появится здесь автоматически."
+            }
           />
         )}
       </section>
@@ -292,6 +449,11 @@ function CreateLeadModal({
   const [channel, setChannel] = useState<Channel>('phone')
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
+  const [services, setServices] = useState<Service[]>([])
+
+  useEffect(() => {
+    void getServices().then((payload) => setServices(payload.items.filter((item) => item.active !== false)))
+  }, [])
 
   const valid = name.trim().length > 1 && phone.replace(/\D/g, '').length >= 10
 
@@ -334,7 +496,7 @@ function CreateLeadModal({
         </Field>
         <Field label="Услуга">
           <select className="select" value={service} onChange={(event) => setService(event.target.value)}>
-            {SERVICES.map((item) => (
+            {services.map((item) => (
               <option key={item.id} value={item.title}>
                 {item.title} — {formatPrice(item.price)}
               </option>

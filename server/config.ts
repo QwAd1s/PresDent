@@ -1,4 +1,4 @@
-import path from 'node:path'
+﻿import path from 'node:path'
 
 /**
  * .env читаем нативным загрузчиком Node (без dotenv),
@@ -27,6 +27,8 @@ export const config = {
   /** true — сообщения не уходят в Meta, а логируются (удобно на старте) */
   dryRun: (env.DRY_RUN ?? 'true') !== 'false',
   metaAppSecret: env.META_APP_SECRET ?? '',
+  /** Принудительно пересоздать базу из фикстур (в том числе на PostgreSQL) */
+  seedReset: (env.SEED_RESET ?? 'false') === 'true',
   database: {
     driver: resolveDriver(),
     url: env.DATABASE_URL ?? '',

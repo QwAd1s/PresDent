@@ -1,5 +1,5 @@
 import type { Appointment, ClinicSettings, Doctor } from './types'
-import { SERVICES, findService, formatPrice } from './services'
+import { findServiceIn, formatPrice, type Service } from './services'
 import { dateWithWeekday, freeSlots, type SlotOffer } from './slots'
 
 /**
@@ -14,6 +14,7 @@ export interface PatientAssistantData {
   settings: ClinicSettings
   doctors: Doctor[]
   appointments: Appointment[]
+  services: Service[]
 }
 
 export interface PatientSlot {
@@ -185,8 +186,8 @@ function detectDoctor(text: string, doctors: Doctor[]): Doctor | null {
   return null
 }
 
-function doctorForService(service: string, doctors: Doctor[]): Doctor | null {
-  const target = findService(service)
+function doctorForService(service: string, doctors: Doctor[], services: Service[]): Doctor | null {
+  const target = findServiceIn(services, service)
   if (!target) return doctors[0] ?? null
   return doctors.find((item) => normalize(item.specialty).includes(target.specialty)) ?? doctors[0] ?? null
 }
@@ -202,7 +203,7 @@ function buildSlots(
   data: PatientAssistantData,
   limit = 6,
 ): PatientSlot[] {
-  const duration = findService(service)?.durationMin ?? 30
+  const duration = findServiceIn(data.services, service)?.durationMin ?? 30
   const offers: SlotOffer[] = freeSlots(doctor, date, duration, data.appointments, service, undefined, {
     limit,
     earliest: new Date(Date.now() + 60 * 60_000),
@@ -219,7 +220,7 @@ function buildSlots(
 }
 
 function priceAnswer(title: string, data: PatientAssistantData): PatientReply {
-  const service = findService(title)
+  const service = findServiceIn(data.services, title)
   if (!service) return fallback(data)
 
   return {
@@ -332,7 +333,7 @@ export function patientAssistantReply(input: {
   if (/запис|свобод|окно|когда можно|принимает/.test(t)) {
     const targetDate = date ?? new Date(Date.now() + 86_400_000)
     const targetService = service ?? 'Консультация'
-    const targetDoctor = doctor ?? doctorForService(targetService, data.doctors)
+    const targetDoctor = doctor ?? doctorForService(targetService, data.doctors, data.services)
 
     if (!targetDoctor) {
       return { intent: 'slots_empty', text: `Не нашёл врача по этому направлению. Позвоните: ${data.settings.phone}.`, chips: BASE_CHIPS }
@@ -385,7 +386,11 @@ export function patientAssistantReply(input: {
 
   // Список услуг и цен
   if (/услуг|цен|прайс|сколько стоит|стоимост/.test(t)) {
-    const top = SERVICES.slice(0, 6).map((item) => `• ${item.title} — ${formatPrice(item.price)}`).join('\n')
+    const top = data.services
+      .filter((item) => item.active !== false)
+      .slice(0, 6)
+      .map((item) => `• ${item.title} — ${formatPrice(item.price)}`)
+      .join('\n')
     return {
       intent: 'services',
       text: `Популярные услуги:\n${top}\n\nПолный список — в разделе «Услуги и цены» на этой странице. Назовите услугу, и я подскажу детали.`,
@@ -395,7 +400,7 @@ export function patientAssistantReply(input: {
 
   // Врачи
   if (/врач|доктор|специалист|кто лечит/.test(t)) {
-    const target = doctor ?? (service ? doctorForService(service, data.doctors) : null)
+    const target = doctor ?? (service ? doctorForService(service, data.doctors, data.services) : null)
     if (target) {
       return {
         intent: 'doctor',

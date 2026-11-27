@@ -4,7 +4,7 @@ import type { Doctor, Lead, Stats } from '../../shared/types'
 import { CHANNEL_LABEL } from '../../shared/types'
 import { getDoctors, getLeads, getStats, subscribe, connectRealtime } from '../lib/api'
 import { useAuth } from '../lib/auth'
-import { initials, relativeTime } from '../lib/format'
+import { initials, plural, relativeTime } from '../lib/format'
 import { Icon, type IconName } from '../components/Icon'
 import { ChannelIcon, ChannelTag, SkeletonRows, Stars, StatusBadge, Avatar } from '../components/ui'
 import { ChannelLegend, LeadsChart } from '../components/LeadsChart'
@@ -130,7 +130,7 @@ export default function Dashboard() {
         {stats ? (
           <>
             <Kpi
-              label="Новые заявки"
+              label="Обращения сегодня"
               value={stats.newLeads}
               delta={stats.newLeadsDelta}
               icon="inbox"
@@ -169,7 +169,7 @@ export default function Dashboard() {
               icon="clock"
               color="#8A5A06"
               soft="#FDF4E3"
-              foot="быстрее нормы"
+              foot={stats.avgResponseMin > 0 ? 'быстрее нормы' : 'пока нет ответов'}
             />
           </>
         ) : (
@@ -250,8 +250,8 @@ export default function Dashboard() {
                 <span className="icon-wrap">
                   <Icon name="check" size={20} />
                 </span>
-                <div style={{ fontWeight: 600, color: 'var(--ink-2)' }}>Все заявки обработаны</div>
-                <div style={{ fontSize: 12.5 }}>Новые обращения появятся здесь автоматически</div>
+                <div style={{ fontWeight: 600, color: 'var(--ink-2)' }}>Заявок пока нет</div>
+                <div style={{ fontSize: 12.5 }}>Появятся, когда пациент напишет в WhatsApp, Instagram или оставит заявку на сайте</div>
               </div>
             )}
           </section>
@@ -281,7 +281,7 @@ export default function Dashboard() {
                       <span className="source-meter">
                         <span
                           style={{
-                            width: `${Math.min(Math.max(share, 4), 100)}%`,
+                            width: `${item.count === 0 ? 0 : Math.min(Math.max(share, 4), 100)}%`,
                             background: CHANNEL_COLOR[item.channel],
                           }}
                         />
@@ -324,7 +324,7 @@ export default function Dashboard() {
                       {doctor.name.split(' ').slice(0, 2).join(' ')}
                     </div>
                     <div className="muted" style={{ fontSize: 11 }}>
-                      {doctor.todayAppointments} приёма
+                      {doctor.todayAppointments} {plural(doctor.todayAppointments, ['приём', 'приёма', 'приёмов'])}
                     </div>
                   </div>
                   <span className="load-track">
@@ -350,7 +350,9 @@ export default function Dashboard() {
               <div>
                 <div className="card-title">Последние отзывы</div>
                 <div className="card-sub">
-                  {stats ? `Средняя оценка ${(stats.recentReviews.reduce((sum, r) => sum + r.rating, 0) / Math.max(stats.recentReviews.length, 1)).toFixed(1)}` : '—'}
+                  {stats && stats.recentReviews.length
+                    ? `Средняя оценка ${(stats.recentReviews.reduce((sum, r) => sum + r.rating, 0) / stats.recentReviews.length).toFixed(1)}`
+                    : 'Отзывов пока нет'}
                 </div>
               </div>
               <button className="btn-link" onClick={() => navigate('/reviews')}>
@@ -374,6 +376,11 @@ export default function Dashboard() {
                 </div>
               ))}
               {!stats && <SkeletonRows rows={3} />}
+              {stats && stats.recentReviews.length === 0 && (
+                <div className="muted" style={{ fontSize: 12.5 }}>
+                  Пока никто не оставлял отзывов — они появятся после визитов.
+                </div>
+              )}
             </div>
           </section>
         </div>

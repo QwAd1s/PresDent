@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   Appointment,
   Channel,
   ChannelEvent,
@@ -18,11 +18,11 @@ import {
   leads as seedLeads,
   patients as seedPatients,
   reviews as seedReviews,
-  series as seedSeries,
 } from '../../shared/fixtures'
 import { formatRuPhone } from './phone'
 import { availableSlots } from '../../shared/slots'
-import { SERVICE_DURATION } from '../../shared/services'
+import { buildSeries, doctorMetrics } from '../../shared/stats'
+import { SERVICE_DURATION, SERVICES } from '../../shared/services'
 
 /**
  * Демо-хранилище: полная копия поведения API в памяти браузера.
@@ -59,12 +59,14 @@ export interface LeadQuery {
   status?: string
   channel?: string
   q?: string
+  archived?: boolean
 }
 
 export function listLeads(query: LeadQuery = {}): LeadsResponse {
   const search = query.q?.trim().toLowerCase()
 
   const base = leads.filter((lead) => {
+    if (Boolean(lead.archived) !== Boolean(query.archived)) return false
     if (query.channel && query.channel !== 'all' && lead.channel !== query.channel) return false
     if (!search) return true
     return [lead.name, lead.phone, lead.handle, lead.service, lead.messages.at(-1)?.text]
@@ -201,7 +203,8 @@ export function getPatients(query = ''): { items: Patient[]; total: number } {
   return { items, total: patients.length }
 }
 
-export const getDoctors = () => ({ items: doctors })
+export const getServices = () => structuredClone(SERVICES).map((service) => ({ ...service, active: true }))
+export const getDoctors = () => ({ items: doctors.map((doctor) => ({ ...doctor, ...doctorMetrics(doctor, appointments, reviews) })) })
 export const getAppointments = () => ({ items: appointments })
 
 export function getReviews() {
@@ -299,17 +302,7 @@ export function getStats(): Stats {
   const appointmentsYesterday = appointments.filter((a) => localDay(a.start) === yesterdayKey)
   const converted = leads.filter((lead) => lead.status === 'booked' || lead.status === 'closed').length
 
-  const series = seedSeries.map((point) => {
-    if (point.date !== todayKey) return point
-    const count = (channel: Channel) => todayLeads.filter((lead) => lead.channel === channel).length
-    return {
-      date: point.date,
-      whatsapp: count('whatsapp'),
-      instagram: count('instagram'),
-      site: count('site'),
-      phone: count('phone'),
-    }
-  })
+  const series = buildSeries(leads)
 
   return {
     newLeads: todayLeads.length,
@@ -319,23 +312,27 @@ export function getStats(): Stats {
     appointmentsToday: appointmentsToday.length,
     appointmentsDelta: appointmentsToday.length - appointmentsYesterday.length,
     conversion: leads.length ? percent((converted / leads.length) * 100) : 0,
-    conversionDelta: 2.4,
-    avgResponseMin: 8.4,
-    avgResponseDelta: -1.4,
+    conversionDelta: 0,
+    avgResponseMin: 0,
+    avgResponseDelta: 0,
     series,
     byChannel: (['whatsapp', 'instagram', 'site', 'phone'] as Channel[]).map((channel) => ({
       channel,
       count: leads.filter((lead) => lead.channel === channel).length,
     })),
-    doctorsLoad: doctors.map((doctor) => ({
-      id: doctor.id,
-      name: doctor.name,
-      color: doctor.color,
-      loadPercent: doctor.loadPercent,
-      todayAppointments: doctor.todayAppointments,
-    })),
+    doctorsLoad: doctors.map((doctor) => {
+      const metrics = doctorMetrics(doctor, appointments, reviews)
+      return {
+        id: doctor.id,
+        name: doctor.name,
+        color: doctor.color,
+        loadPercent: metrics.loadPercent,
+        todayAppointments: metrics.todayAppointments,
+      }
+    }),
     recentReviews: [...reviews].sort((a, b) => +new Date(b.at) - +new Date(a.at)).slice(0, 3),
     totalLeads: leads.length,
+    unprocessedLeads: leads.filter((lead) => lead.status === 'new').length,
   }
 }
 

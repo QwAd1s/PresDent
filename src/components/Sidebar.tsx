@@ -32,6 +32,7 @@ export function Sidebar({ newLeads, unansweredReviews }: SidebarProps) {
       : []),
     { to: '/patients', label: 'База пациентов', icon: 'users' },
     { to: '/doctors', label: 'Врачи', icon: 'doctor' },
+    { to: '/services', label: 'Услуги и цены', icon: 'card' },
     { to: '/schedule', label: 'Расписание', icon: 'calendar' },
     { to: '/reviews', label: 'Отзывы', icon: 'star', badge: unansweredReviews || undefined },
   ]

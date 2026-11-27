@@ -1,4 +1,4 @@
-import fs from 'node:fs'
+﻿import fs from 'node:fs'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type {
@@ -23,6 +23,8 @@ import {
   reviews as seedReviews,
 } from '../shared/fixtures'
 import { hashPassword } from './password'
+import { SERVICES } from '../shared/services'
+import type { Service } from '../shared/services'
 import { config } from './config'
 import { connectPglite, connectPostgres, ensureSchema, persistAll, type SqlClient } from './db'
 
@@ -34,6 +36,7 @@ export interface Database {
   reviews: Review[]
   appointments: Appointment[]
   settings: ClinicSettings
+  services: Service[]
   events: ChannelEvent[]
   users: StoredUser[]
   sessions: SessionRecord[]
@@ -42,7 +45,7 @@ export interface Database {
 }
 
 /** Версия демо-данных: увеличивается только при изменении фикстур. */
-const SEED_VERSION = 3
+const SEED_VERSION = 4
 
 const DATA_DIR = path.join(process.cwd(), 'server', 'data')
 const DB_FILE = path.join(DATA_DIR, 'db.json')
@@ -100,6 +103,7 @@ function seedDatabase(): Database {
     reviews: structuredClone(seedReviews),
     appointments: structuredClone(seedAppointments),
     settings: structuredClone(seedSettings),
+    services: structuredClone(SERVICES).map((service) => ({ ...service, active: true })),
     events: [
       {
         id: randomUUID(),
@@ -131,6 +135,7 @@ function loadJsonDatabase(): Database {
     parsed.sessions ??= []
     parsed.audit ??= []
     parsed.reminders ??= []
+    parsed.services ??= structuredClone(SERVICES).map((service) => ({ ...service, active: true }))
     return parsed
   } catch {
     return seedDatabase()
@@ -154,6 +159,12 @@ export async function initStore(): Promise<void> {
   const client = driver === 'postgres' ? await connectPostgres(url) : await connectPglite(pgliteDir)
   sqlClient = client
   db = await ensureSchema(client, SEED_VERSION, seedDatabase)
+
+  // в старых базах не было справочника услуг — досоздаём из дефолтного каталога
+  if (!db.services.length) {
+    db.services = structuredClone(SERVICES).map((service) => ({ ...service, active: true }))
+    saveDb()
+  }
 
   console.log(
     `[db] ${driver} — загружено: заявок ${db.leads.length}, пациентов ${db.patients.length}, ` +

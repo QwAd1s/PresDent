@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Lead, LeadStatus } from '../../shared/types'
 import { CHANNEL_LABEL, STATUS_LABEL } from '../../shared/types'
-import { SERVICES, findService, formatPrice } from '../../shared/services'
-import { updateLead, sendMessage } from '../lib/api'
+import { formatPrice } from '../../shared/services'
+import type { Service } from '../../shared/services'
+import { getServices, updateLead, sendMessage } from '../lib/api'
 import { formatDate, formatTime, relativeTime } from '../lib/format'
 import { Icon } from './Icon'
 import { Avatar, ChannelTag, StatusBadge } from './ui'
@@ -35,6 +36,13 @@ export function LeadDrawer({ lead, onClose, onChanged }: LeadDrawerProps) {
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState(lead.note ?? '')
+  const [services, setServices] = useState<Service[]>([])
+
+  useEffect(() => {
+    void getServices().then((payload) => setServices(payload.items))
+  }, [])
+
+  const serviceInfo = services.find((item) => item.title === lead.service)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -121,9 +129,9 @@ export function LeadDrawer({ lead, onClose, onChanged }: LeadDrawerProps) {
               <Icon name="inbox" size={13} />
               {lead.service ?? 'Без услуги'}
             </span>
-            {findService(lead.service) && (
+            {serviceInfo && (
               <span className="pill" style={{ color: 'var(--brand-dark)', background: 'var(--brand-soft)', borderColor: '#cdeee2' }}>
-                {formatPrice(findService(lead.service)!.price)} · {findService(lead.service)!.durationMin} мин
+                {formatPrice(serviceInfo.price)} · {serviceInfo.durationMin} мин
               </span>
             )}
             {lead.priority === 'high' && (
@@ -161,9 +169,9 @@ export function LeadDrawer({ lead, onClose, onChanged }: LeadDrawerProps) {
                   if (updated) onChanged(updated)
                 }}
               >
-                {(lead.service && !findService(lead.service)
-                  ? [{ title: lead.service }, ...SERVICES]
-                  : SERVICES
+                {(lead.service && !serviceInfo
+                  ? [{ title: lead.service }, ...services]
+                  : services
                 ).map((service) => (
                   <option key={service.title} value={service.title}>
                     {service.title}

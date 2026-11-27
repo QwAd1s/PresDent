@@ -36,6 +36,9 @@ export interface Lead {
   note?: string
   messages: LeadMessage[]
   externalId?: string
+  /** В архиве: скрыта из рабочих списков, но остаётся в базе */
+  archived?: boolean
+  archivedAt?: string
 }
 
 export interface Patient {
@@ -131,6 +134,8 @@ export interface Stats {
   doctorsLoad: { id: string; name: string; color: string; loadPercent: number; todayAppointments: number }[]
   recentReviews: Review[]
   totalLeads: number
+  /** Заявки без ответа администратора (status = new) — для бейджа в меню */
+  unprocessedLeads: number
 }
 
 export interface ClinicSettings {
@@ -194,6 +199,8 @@ export type AuditEntity =
   | 'user'
   | 'patient'
   | 'reminder'
+  | 'doctor'
+  | 'service'
 
 export interface AuditRecord {
   id: string

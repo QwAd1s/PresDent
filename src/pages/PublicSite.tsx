@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import type { Service } from '../../shared/services'
-import { findService, formatPrice } from '../../shared/services'
+import { formatPrice } from '../../shared/services'
 import {
   bookOnline,
   getClinic,
@@ -120,22 +120,28 @@ export default function PublicSite() {
 
               {clinic && (
                 <div className="site-trust">
-                  <div>
-                    <b>{clinic.trust.rating.toFixed(1)}</b>
-                    <span>средняя оценка</span>
-                  </div>
+                  {clinic.trust.rating > 0 && (
+                    <div>
+                      <b>{clinic.trust.rating.toFixed(1)}</b>
+                      <span>средняя оценка</span>
+                    </div>
+                  )}
                   <div>
                     <b>{clinic.trust.doctors}</b>
                     <span>врачей</span>
                   </div>
-                  <div>
-                    <b>{clinic.trust.patients}</b>
-                    <span>пациентов</span>
-                  </div>
-                  <div>
-                    <b>{clinic.trust.reviews}</b>
-                    <span>отзывов</span>
-                  </div>
+                  {clinic.trust.patients > 0 && (
+                    <div>
+                      <b>{clinic.trust.patients}</b>
+                      <span>пациентов</span>
+                    </div>
+                  )}
+                  {clinic.trust.reviews > 0 && (
+                    <div>
+                      <b>{clinic.trust.reviews}</b>
+                      <span>отзывов</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -157,7 +163,7 @@ export default function PublicSite() {
                           <b>{doctor.name.split(' ').slice(1).join(' ')}</b>
                           <span>{doctor.specialty}</span>
                         </div>
-                        <em>{doctor.rating.toFixed(1)} ★</em>
+                        {doctor.reviewsCount > 0 && <em>{doctor.rating.toFixed(1)} ★</em>}
                       </div>
                     ))}
                   </div>
@@ -225,7 +231,7 @@ export default function PublicSite() {
                   <b>{doctor.name}</b>
                   <span className="site-doctor-specialty">{doctor.specialty}</span>
                   <div className="site-doctor-meta">
-                    <span>★ {doctor.rating.toFixed(1)}</span>
+                    {doctor.reviewsCount > 0 && <span>★ {doctor.rating.toFixed(1)}</span>}
                     <span>стаж {doctor.experienceYears} лет</span>
                     <span>{workingDaysLabel(doctor.workingDays)}</span>
                   </div>
@@ -323,12 +329,12 @@ function BookingForm({
 
   const pickDoctorFor = useCallback(
     (serviceTitle: string) => {
-      const target = findService(serviceTitle)
+      const target = clinic.services.find((item) => item.title === serviceTitle)
       if (!target) return
       const match = clinic.doctors.find((item) => item.specialty.toLowerCase().includes(target.specialty))
       setDoctorId(match?.id ?? clinic.doctors[0]?.id ?? '')
     },
-    [clinic.doctors],
+    [clinic.doctors, clinic.services],
   )
 
   useEffect(() => {
@@ -495,7 +501,7 @@ function BookingForm({
           <select value={doctorId} onChange={(event) => setDoctorId(event.target.value)}>
             {clinic.doctors.map((item) => (
               <option key={item.id} value={item.id}>
-                {item.name} — {item.specialty}
+                {item.name}
               </option>
             ))}
           </select>

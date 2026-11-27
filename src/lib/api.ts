@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   Appointment,
   AuditRecord,
   Channel,
@@ -16,6 +16,7 @@ import type {
 } from '../../shared/types'
 import * as demo from './mock'
 import type { SlotOffer } from '../../shared/slots'
+import type { Service } from '../../shared/services'
 
 const BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -309,6 +310,7 @@ export interface LeadsQuery {
   status?: string
   channel?: string
   q?: string
+  archived?: boolean
 }
 
 export async function getLeads(query: LeadsQuery = {}): Promise<LeadsResponse> {
@@ -316,9 +318,29 @@ export async function getLeads(query: LeadsQuery = {}): Promise<LeadsResponse> {
   if (query.status && query.status !== 'all') params.set('status', query.status)
   if (query.channel && query.channel !== 'all') params.set('channel', query.channel)
   if (query.q) params.set('q', query.q)
+  if (query.archived) params.set('archived', '1')
   const suffix = params.toString() ? `?${params}` : ''
 
   return (await http<LeadsResponse>(`/api/leads${suffix}`)) ?? demo.listLeads(query)
+}
+
+export type LeadBulkAction = 'archive' | 'restore' | 'delete' | 'status'
+
+/** Массовые действия с заявками: архив, возврат, удаление, смена статуса. */
+export async function bulkLeads(
+  ids: string[],
+  action: LeadBulkAction,
+  status?: string,
+): Promise<{ ok: boolean; affected?: number; error?: string }> {
+  if (demoMode) return { ok: false, error: 'В демо-режиме массовые действия недоступны' }
+
+  const result = await sendJson<{ ok: boolean; affected: number }>('/api/leads/bulk', 'POST', {
+    ids,
+    action,
+    status,
+  })
+
+  return { ok: result.ok, affected: result.data?.affected, error: result.error }
 }
 
 export async function updateLead(id: string, patch: Partial<Lead>): Promise<Lead | null> {
@@ -355,9 +377,80 @@ export async function getStats(): Promise<Stats> {
   return (await http<Stats>('/api/stats')) ?? demo.getStats()
 }
 
+export async function getServices(): Promise<{ items: Service[] }> {
+  return (await http<{ items: Service[] }>('/api/services')) ?? { items: demo.getServices() }
+}
+
+export async function createService(input: {
+  title: string
+  category: string
+  price: number
+  durationMin: number
+  specialty?: string
+  description?: string
+}): Promise<{ ok: boolean; service?: Service; error?: string }> {
+  const result = await sendJson<Service>('/api/services', 'POST', input)
+  return { ok: result.ok, service: result.data, error: result.error }
+}
+
+export async function updateService(
+  id: string,
+  patch: Partial<Pick<Service, 'title' | 'category' | 'price' | 'durationMin' | 'specialty' | 'description' | 'active'>>,
+): Promise<{ ok: boolean; service?: Service; error?: string }> {
+  const result = await sendJson<Service>(`/api/services/${id}`, 'PATCH', patch)
+  return { ok: result.ok, service: result.data, error: result.error }
+}
+
 export async function getPatients(q = ''): Promise<{ items: Patient[]; total: number }> {
   const suffix = q ? `?q=${encodeURIComponent(q)}` : ''
   return (await http<{ items: Patient[]; total: number }>(`/api/patients${suffix}`)) ?? demo.getPatients(q)
+}
+
+/** Новый пациент из карточки администратора. */
+export async function createPatient(input: {
+  name: string
+  phone: string
+  birthDate?: string
+  doctorId?: string
+  tags?: string[]
+  notes?: string
+  channel?: Channel
+}): Promise<{ ok: boolean; patient?: Patient; error?: string }> {
+  const result = await sendJson<Patient>('/api/patients', 'POST', input)
+  return { ok: result.ok, patient: result.data, error: result.error }
+}
+
+/** Новый врач — без рейтинга и загрузки, они считаются из отзывов и приёмов. */
+export async function createDoctor(input: {
+  name: string
+  specialty: string
+  experienceYears?: number
+  color?: string
+  workingDays?: number[]
+}): Promise<{ ok: boolean; doctor?: Doctor; error?: string }> {
+  const result = await sendJson<Doctor>('/api/doctors', 'POST', input)
+  return { ok: result.ok, doctor: result.data, error: result.error }
+}
+
+/** Полная выгрузка данных клиники в JSON (бэкап перед чисткой). */
+export async function downloadExport(): Promise<{ ok: boolean; error?: string }> {
+  if (demoMode) return { ok: false, error: 'В демо-режиме выгрузка недоступна' }
+
+  try {
+    const response = await fetch(`${BASE}/api/export`, { signal: AbortSignal.timeout(20_000) })
+    if (!response.ok) return { ok: false, error: 'Не удалось выгрузить данные' }
+
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `president-${new Date().toISOString().slice(0, 10)}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    return { ok: true }
+  } catch {
+    return { ok: false, error: 'Сервер недоступен' }
+  }
 }
 
 export async function getDoctors(): Promise<{ items: Doctor[] }> {

@@ -15,6 +15,8 @@ const ENTITY_LABEL: Record<AuditEntity | 'all', string> = {
   settings: 'Настройки',
   patient: 'Пациенты',
   reminder: 'Напоминания',
+  doctor: 'Врачи',
+  service: 'Услуги',
 }
 
 const ENTITY_COLOR: Record<AuditEntity, { bg: string; color: string }> = {
@@ -26,6 +28,8 @@ const ENTITY_COLOR: Record<AuditEntity, { bg: string; color: string }> = {
   settings: { bg: '#E7F3F6', color: '#0F7C93' },
   patient: { bg: '#FDECEF', color: '#B8375A' },
   reminder: { bg: '#EAF7F3', color: '#0B6E59' },
+  doctor: { bg: '#EAF1FE', color: '#2F6FED' },
+  service: { bg: '#F1F7EE', color: '#3F6B1F' },
 }
 
 const ACTION_LABEL: Record<string, string> = {
@@ -48,9 +52,11 @@ const ACTION_LABEL: Record<string, string> = {
   'user.password_reset': 'Сброс пароля',
   'reminders.run': 'Запуск напоминаний',
   'reminder.skip': 'Напоминание пропущено',
+  'service.create': 'Услуга добавлена',
+  'service.update': 'Услуга изменена',
 }
 
-const ENTITIES: (AuditEntity | 'all')[] = ['all', 'lead', 'appointment', 'reminder', 'review', 'auth', 'user', 'settings']
+const ENTITIES: (AuditEntity | 'all')[] = ['all', 'lead', 'appointment', 'reminder', 'review', 'auth', 'user', 'settings', 'service']
 
 export default function Audit() {
   const [entity, setEntity] = useState<AuditEntity | 'all'>('all')

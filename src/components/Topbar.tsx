@@ -10,6 +10,7 @@ export const PAGE_TITLES: Record<string, string> = {
   '/leads': 'Заявки',
   '/patients': 'База пациентов',
   '/doctors': 'Врачи',
+  '/services': 'Услуги и цены',
   '/schedule': 'Расписание',
   '/reviews': 'Отзывы',
   '/channels': 'Каналы и интеграции',

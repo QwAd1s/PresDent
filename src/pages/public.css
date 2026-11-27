@@ -1,4 +1,8 @@
-/* Публичный сайт клиники */
+﻿/* Публичный сайт клиники */
+
+section[id] {
+  scroll-margin-top: 84px;
+}
 
 .site {
   --site-bg: #fbfdfc;
@@ -790,5 +794,22 @@
   .site-booking-foot .site-btn {
     margin-left: 0;
     width: 100%;
+  }
+}
+
+/* Компактная кнопка помощника на телефонах — не перекрывает поля формы */
+@media (max-width: 560px) {
+  .pa-launcher {
+    width: 52px;
+    height: 52px;
+    padding: 0;
+    border-radius: 16px;
+    justify-content: center;
+  }
+  .pa-launcher > span:last-child {
+    display: none;
+  }
+  .pa-launcher-icon {
+    background: transparent;
   }
 }

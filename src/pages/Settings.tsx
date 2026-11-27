@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import type { ClinicSettings, Doctor, User, UserRole } from '../../shared/types'
 import { ROLE_LABEL, ROLE_SCOPE } from '../../shared/types'
 import {
   createUser,
+  downloadExport,
   getDoctors,
   getSettings,
   getTeam,
@@ -45,6 +46,7 @@ export default function Settings() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [tempPassword, setTempPassword] = useState<{ email: string; password: string } | null>(null)
   const [sessionsMessage, setSessionsMessage] = useState<string | null>(null)
+  const [exportMessage, setExportMessage] = useState<string | null>(null)
 
   const reloadTeam = () =>
     getTeam().then((payload) => {
@@ -136,6 +138,11 @@ export default function Settings() {
     }
     setTempPassword({ email: member.email, password: result.password })
     await reloadTeam()
+  }
+
+  const exportAll = async () => {
+    const result = await downloadExport()
+    setExportMessage(result.ok ? 'Файл сформирован и скачивается' : (result.error ?? 'Не удалось выгрузить данные'))
   }
 
   const endOtherSessions = async () => {
@@ -520,6 +527,19 @@ export default function Settings() {
                 <Icon name="card" size={15} />
                 {passwordBusy ? 'Меняем…' : 'Сменить пароль'}
               </button>
+
+              <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12, display: 'grid', gap: 8 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-2)' }}>Данные клиники</div>
+                <div className="muted" style={{ fontSize: 11.5, lineHeight: 1.5 }}>
+                  Полная выгрузка базы в JSON: заявки, пациенты, приёмы, отзывы, врачи и журнал. Делайте копию перед
+                  массовой чисткой или переносом.
+                </div>
+                <button className="btn btn-ghost btn-sm" style={{ justifySelf: 'start' }} onClick={() => void exportAll()}>
+                  <Icon name="card" size={14} />
+                  Скачать архив данных
+                </button>
+                {exportMessage && <div className="muted" style={{ fontSize: 11.5 }}>{exportMessage}</div>}
+              </div>
 
               <div style={{ borderTop: '1px solid var(--line)', paddingTop: 12, display: 'grid', gap: 8 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink-2)' }}>Активные сессии</div>

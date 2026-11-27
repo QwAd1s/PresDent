@@ -1,5 +1,6 @@
-import type { Database } from './store'
+﻿import type { Database } from './store'
 import { clinicSettings } from '../shared/fixtures'
+import { config } from './config'
 
 /**
  * Хранилище на PostgreSQL.
@@ -110,6 +111,7 @@ function collect(db: Database): Entry[] {
   push('session', db.sessions)
   push('audit', db.audit)
   push('reminder', db.reminders)
+  push('service', db.services)
   entries.push({ type: 'settings', id: 'clinic', ord: 0, json: JSON.stringify(db.settings) })
 
   return entries
@@ -129,6 +131,7 @@ function emptyDatabase(version: number, settings: Database['settings']): Databas
     sessions: [],
     audit: [],
     reminders: [],
+    services: [],
   }
 }
 
@@ -175,6 +178,9 @@ export async function loadAll(
         break
       case 'reminder':
         db.reminders.push(data as unknown as Database['reminders'][number])
+        break
+      case 'service':
+        db.services.push(data as unknown as Database['services'][number])
         break
       case 'settings':
         db.settings = data as unknown as Database['settings']
@@ -263,7 +269,7 @@ export async function ensureSchema(
   const countResult = await client.query<{ count: number }>('select count(*)::int as count from entities')
   const total = Number(countResult.rows[0]?.count ?? 0)
 
-  if (total === 0) {
+  if (total === 0 || config.seedReset) {
     const seeded = seedFactory()
     await replaceAll(client, seeded)
     await client.query(

@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard'
 import Leads from './pages/Leads'
 import Patients from './pages/Patients'
 import Doctors from './pages/Doctors'
+import Services from './pages/Services'
 import Schedule from './pages/Schedule'
 import Reviews from './pages/Reviews'
 import Channels from './pages/Channels'
@@ -41,6 +42,14 @@ export default function App() {
           />
           <Route path="patients" element={<Patients />} />
           <Route path="doctors" element={<Doctors />} />
+          <Route
+            path="services"
+            element={
+              <RoleGate roles={[...STAFF]}>
+                <Services />
+              </RoleGate>
+            }
+          />
           <Route path="schedule" element={<Schedule />} />
           <Route path="reviews" element={<Reviews />} />
           <Route

@@ -1,9 +1,11 @@
-import express from 'express'
+﻿import express from 'express'
 import { randomBytes } from 'node:crypto'
-import type { Appointment, Lead, LeadsResponse, LeadStatus, Stats, StoredUser, UserRole } from '../shared/types'
-import { channelStates, series as seedSeries } from '../shared/fixtures'
+import type { Appointment, Doctor, Lead, LeadsResponse, LeadStatus, Patient, Stats, StoredUser, UserRole } from '../shared/types'
+import { channelStates } from '../shared/fixtures'
+import { buildSeries, doctorMetrics } from '../shared/stats'
 import { availableSlots, dateWithWeekday } from '../shared/slots'
-import { SERVICE_DURATION } from '../shared/services'
+import { serviceDurationIn } from '../shared/services'
+import type { Service } from '../shared/services'
 import { auditRequest, recordAudit } from './audit'
 import { publicRouter } from './public-routes'
 import { planReminders, processDue, reminderStats } from './reminders'
@@ -393,38 +395,29 @@ router.post('/reminders/:id/skip', staffOnly, (req, res) => {
 router.get('/stats', (_req, res) => {
   const db = getDb()
   const now = new Date()
-  const dayStartLeads = db.leads.filter((lead) => localDay(lead.createdAt) === today())
+  // архивные заявки не участвуют в статистике
+  const activeLeads = db.leads.filter((lead) => !lead.archived)
+  const dayStartLeads = activeLeads.filter((lead) => localDay(lead.createdAt) === today())
 
   const yesterday = new Date(now)
   yesterday.setDate(now.getDate() - 1)
   const yesterdayKey = localDay(yesterday)
-  const yesterdayLeads = db.leads.filter((lead) => localDay(lead.createdAt) === yesterdayKey)
+  const yesterdayLeads = activeLeads.filter((lead) => localDay(lead.createdAt) === yesterdayKey)
 
   const appointmentsToday = db.appointments.filter((a) => localDay(a.start) === today())
   const appointmentsYesterday = db.appointments.filter((a) => localDay(a.start) === yesterdayKey)
 
-  const converted = db.leads.filter((lead) => lead.status === 'booked' || lead.status === 'closed').length
-  const conversion = db.leads.length ? percent((converted / db.leads.length) * 100) : 0
+  const converted = activeLeads.filter((lead) => lead.status === 'booked' || lead.status === 'closed').length
+  const conversion = activeLeads.length ? percent((converted / activeLeads.length) * 100) : 0
 
-  const series = seedSeries.map((point) => {
-    if (point.date !== today()) return point
-    const count = (channel: 'whatsapp' | 'instagram' | 'site' | 'phone') =>
-      dayStartLeads.filter((lead) => lead.channel === channel).length
-    return {
-      date: point.date,
-      whatsapp: count('whatsapp'),
-      instagram: count('instagram'),
-      site: count('site'),
-      phone: count('phone'),
-    }
-  })
+  const series = buildSeries(activeLeads)
 
   const byChannel = (['whatsapp', 'instagram', 'site', 'phone'] as const).map((channel) => ({
     channel,
-    count: db.leads.filter((lead) => lead.channel === channel).length,
+    count: activeLeads.filter((lead) => lead.channel === channel).length,
   }))
 
-  const avgResponseMin = averageResponseMinutes(db.leads)
+  const avgResponseMin = averageResponseMinutes(activeLeads)
 
   const stats: Stats = {
     newLeads: dayStartLeads.length,
@@ -434,20 +427,24 @@ router.get('/stats', (_req, res) => {
     appointmentsToday: appointmentsToday.length,
     appointmentsDelta: appointmentsToday.length - appointmentsYesterday.length,
     conversion,
-    conversionDelta: 2.4,
+    conversionDelta: 0,
     avgResponseMin,
-    avgResponseDelta: -1.4,
+    avgResponseDelta: 0,
     series,
     byChannel,
-    doctorsLoad: db.doctors.map((doctor) => ({
-      id: doctor.id,
-      name: doctor.name,
-      color: doctor.color,
-      loadPercent: doctor.loadPercent,
-      todayAppointments: doctor.todayAppointments,
-    })),
+    doctorsLoad: db.doctors.map((doctor) => {
+      const metrics = doctorMetrics(doctor, db.appointments, db.reviews)
+      return {
+        id: doctor.id,
+        name: doctor.name,
+        color: doctor.color,
+        loadPercent: metrics.loadPercent,
+        todayAppointments: metrics.todayAppointments,
+      }
+    }),
     recentReviews: [...db.reviews].sort((a, b) => +new Date(b.at) - +new Date(a.at)).slice(0, 3),
-    totalLeads: db.leads.length,
+    totalLeads: activeLeads.length,
+    unprocessedLeads: activeLeads.filter((lead) => lead.status === 'new').length,
   }
 
   res.json(stats)
@@ -457,8 +454,9 @@ router.get('/stats', (_req, res) => {
 
 router.get('/leads', staffOnly, (req, res) => {
   const db = getDb()
-  const { status, channel, q } = req.query as Record<string, string | undefined>
+  const { status, channel, q, archived } = req.query as Record<string, string | undefined>
   const search = q?.trim().toLowerCase()
+  const showArchived = archived === '1'
 
   // «all» — это отсутствие фильтра, а не имя канала
   const channelFilter = channel && channel !== 'all' ? channel : null
@@ -472,7 +470,10 @@ router.get('/leads', staffOnly, (req, res) => {
   }
 
   const base = db.leads.filter(
-    (lead) => (!channelFilter || lead.channel === channelFilter) && matchesSearch(lead),
+    (lead) =>
+      Boolean(lead.archived) === showArchived &&
+      (!channelFilter || lead.channel === channelFilter) &&
+      matchesSearch(lead),
   )
 
   const counts = base.reduce(
@@ -509,24 +510,85 @@ router.patch('/leads/:id', staffOnly, (req, res) => {
     return
   }
 
-  const { status, priority, assignee, note, service } = req.body ?? {}
+  const { status, priority, assignee, note, service, archived } = req.body ?? {}
   const previousStatus = lead.status
   if (status) lead.status = status as LeadStatus
   if (priority) lead.priority = priority
   if (assignee !== undefined) lead.assignee = assignee
   if (note !== undefined) lead.note = note
   if (service !== undefined) lead.service = service
+  if (archived !== undefined) {
+    lead.archived = Boolean(archived)
+    lead.archivedAt = archived ? new Date().toISOString() : undefined
+  }
   lead.unread = 0
   lead.updatedAt = new Date().toISOString()
 
   saveDb()
-  if (status && status !== previousStatus) {
+  if (archived !== undefined) {
+    auditRequest(req, archived ? 'lead.archived' : 'lead.restored', 'lead', lead.id, lead.name)
+  } else if (status && status !== previousStatus) {
     auditRequest(req, 'lead.status', 'lead', lead.id, `${previousStatus} → ${status}`)
   } else {
     auditRequest(req, 'lead.update', 'lead', lead.id, lead.name)
   }
   broadcast('lead:update', lead)
   res.json(lead)
+})
+
+/** Массовые действия: архив, возврат, удаление, смена статуса. */
+router.post('/leads/bulk', staffOnly, (req, res) => {
+  const db = getDb()
+  const ids: string[] = Array.isArray(req.body?.ids) ? req.body.ids.filter(Boolean) : []
+  const action = String(req.body?.action ?? '')
+  const status = req.body?.status as LeadStatus | undefined
+
+  if (!ids.length) {
+    res.status(400).json({ error: 'Не выбраны заявки' })
+    return
+  }
+
+  const affected = db.leads.filter((lead) => ids.includes(lead.id))
+  const now = new Date().toISOString()
+
+  switch (action) {
+    case 'archive':
+      affected.forEach((lead) => {
+        lead.archived = true
+        lead.archivedAt = now
+        lead.updatedAt = now
+      })
+      break
+    case 'restore':
+      affected.forEach((lead) => {
+        lead.archived = false
+        lead.archivedAt = undefined
+        lead.updatedAt = now
+      })
+      break
+    case 'delete':
+      db.leads = db.leads.filter((lead) => !ids.includes(lead.id))
+      break
+    case 'status':
+      if (!status) {
+        res.status(400).json({ error: 'Не указан статус' })
+        return
+      }
+      affected.forEach((lead) => {
+        lead.status = status
+        lead.unread = 0
+        lead.updatedAt = now
+      })
+      break
+    default:
+      res.status(400).json({ error: 'Неизвестное действие' })
+      return
+  }
+
+  saveDb()
+  auditRequest(req, `lead.bulk_${action}`, 'lead', undefined, `Заявок: ${affected.length}`)
+  broadcast('lead:update', { bulk: true, action, count: affected.length })
+  res.json({ ok: true, affected: affected.length })
 })
 
 router.post('/leads', staffOnly, (req, res) => {
@@ -595,8 +657,145 @@ router.get('/patients', (req, res) => {
   res.json({ items, total: db.patients.length })
 })
 
+router.post('/patients', staffOnly, (req, res) => {
+  const db = getDb()
+  const { name, phone, birthDate, doctorId, tags, notes, channel } = req.body ?? {}
+
+  if (!String(name ?? '').trim() || !String(phone ?? '').trim()) {
+    res.status(400).json({ error: 'Укажите имя и телефон' })
+    return
+  }
+
+  const now = new Date().toISOString()
+  const patient: Patient = {
+    id: newId('pat'),
+    name: String(name).trim(),
+    phone: String(phone).trim(),
+    birthDate: birthDate || undefined,
+    since: now,
+    visits: 0,
+    lastVisit: now,
+    totalSpent: 0,
+    doctorId: doctorId || undefined,
+    tags: Array.isArray(tags) ? tags.filter(Boolean) : [],
+    channel: (channel ?? 'phone') as Patient['channel'],
+    notes: notes || undefined,
+  }
+
+  db.patients.push(patient)
+  saveDb()
+  auditRequest(req, 'patient.create', 'patient', patient.id, `${patient.name} · ${patient.phone}`)
+  res.status(201).json(patient)
+})
+
+router.get('/services', staffOnly, (_req, res) => {
+  res.json({ items: getDb().services })
+})
+
+router.post('/services', staffOnly, (req, res) => {
+  const db = getDb()
+  const { title, category, price, durationMin, specialty, description } = req.body ?? {}
+
+  if (!String(title ?? '').trim() || !String(category ?? '').trim()) {
+    res.status(400).json({ error: 'Укажите название и категорию' })
+    return
+  }
+
+  const service: Service = {
+    id: newId('srv'),
+    title: String(title).trim(),
+    category: String(category).trim(),
+    price: Math.max(0, Number(price) || 0),
+    durationMin: Math.min(480, Math.max(10, Number(durationMin) || 30)),
+    specialty: String(specialty ?? 'терапевт').trim() || 'терапевт',
+    description: description ? String(description).trim() : undefined,
+    active: true,
+  }
+
+  db.services.push(service)
+  saveDb()
+  auditRequest(req, 'service.create', 'service', service.id, `${service.title} · ${service.price} ₽`)
+  res.status(201).json(service)
+})
+
+router.patch('/services/:id', staffOnly, (req, res) => {
+  const db = getDb()
+  const service = db.services.find((item) => item.id === req.params.id)
+  if (!service) {
+    res.status(404).json({ error: 'Услуга не найдена' })
+    return
+  }
+
+  const { title, category, price, durationMin, specialty, description, active } = req.body ?? {}
+  const changes: string[] = []
+
+  if (title && String(title).trim() !== service.title) {
+    changes.push(`название: ${service.title} → ${String(title).trim()}`)
+    service.title = String(title).trim()
+  }
+  if (category) service.category = String(category).trim()
+  if (price !== undefined && Number(price) >= 0) {
+    const next = Number(price)
+    if (next !== service.price) changes.push(`цена: ${service.price} → ${next} ₽`)
+    service.price = next
+  }
+  if (durationMin !== undefined) {
+    const next = Math.min(480, Math.max(10, Number(durationMin) || service.durationMin))
+    if (next !== service.durationMin) changes.push(`длительность: ${service.durationMin} → ${next} мин`)
+    service.durationMin = next
+  }
+  if (specialty) service.specialty = String(specialty).trim()
+  if (description !== undefined) service.description = description ? String(description).trim() : undefined
+  if (active !== undefined) {
+    service.active = Boolean(active)
+    changes.push(service.active ? 'услуга включена' : 'услуга скрыта')
+  }
+
+  saveDb()
+  auditRequest(req, 'service.update', 'service', service.id, changes.join('; ') || service.title)
+  res.json(service)
+})
+
 router.get('/doctors', (_req, res) => {
-  res.json({ items: getDb().doctors })
+  const db = getDb()
+  res.json({
+    items: db.doctors.map((doctor) => ({
+      ...doctor,
+      ...doctorMetrics(doctor, db.appointments, db.reviews),
+    })),
+  })
+})
+
+router.post('/doctors', staffOnly, (req, res) => {
+  const db = getDb()
+  const { name, specialty, experienceYears, color, workingDays } = req.body ?? {}
+
+  if (!String(name ?? '').trim() || !String(specialty ?? '').trim()) {
+    res.status(400).json({ error: 'Укажите имя и специализацию' })
+    return
+  }
+
+  const doctor: Doctor = {
+    id: newId('doc'),
+    name: String(name).trim(),
+    specialty: String(specialty).trim(),
+    color: typeof color === 'string' && color ? color : '#0E9E7B',
+    rating: 0,
+    reviewsCount: 0,
+    experienceYears: Number(experienceYears) || 0,
+    loadPercent: 0,
+    nextSlot: '',
+    todayAppointments: 0,
+    workingDays:
+      Array.isArray(workingDays) && workingDays.length
+        ? workingDays.map(Number).filter((day) => day >= 1 && day <= 7)
+        : [1, 2, 3, 4, 5],
+  }
+
+  db.doctors.push(doctor)
+  saveDb()
+  auditRequest(req, 'doctor.create', 'doctor', doctor.id, `${doctor.name} · ${doctor.specialty}`)
+  res.status(201).json(doctor)
 })
 
 router.get('/reviews', (_req, res) => {
@@ -652,7 +851,7 @@ router.get('/slots', anyRole, (req, res) => {
     return
   }
 
-  const durationMin = service ? (SERVICE_DURATION[service] ?? 60) : 60
+  const durationMin = service ? serviceDurationIn(db.services, service) : 60
   const result = availableSlots(doctor, parsed, db.appointments, durationMin, service ?? 'Консультация', 16)
 
   res.json({
@@ -895,6 +1094,29 @@ router.get('/events', (req, res) => {
 
 router.get('/settings', staffOnly, (_req, res) => {
   res.json(getDb().settings)
+})
+
+/** Полная выгрузка данных клиники: используется для бэкапа перед чисткой. */
+router.get('/export', staffOnly, (req, res) => {
+  const db = getDb()
+  auditRequest(req, 'settings.export', 'settings', 'export', 'Полная выгрузка данных')
+
+  res.setHeader('Content-Type', 'application/json; charset=utf-8')
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="president-${new Date().toISOString().slice(0, 10)}.json"`,
+  )
+  res.json({
+    exportedAt: new Date().toISOString(),
+    settings: db.settings,
+    doctors: db.doctors,
+    patients: db.patients,
+    leads: db.leads,
+    appointments: db.appointments,
+    reviews: db.reviews,
+    audit: db.audit,
+    users: db.users.map(publicUser),
+  })
 })
 
 router.put('/settings', staffOnly, (req, res) => {
