@@ -12,7 +12,7 @@ import { ChannelLegend, LeadsChart } from '../components/LeadsChart'
 const CHANNEL_COLOR: Record<string, string> = {
   whatsapp: '#25d366',
   instagram: '#dd2a7b',
-  site: '#64748b',
+  site: '#0f8aa8',
   phone: '#e5a63c',
 }
 
@@ -275,15 +275,18 @@ export default function Dashboard() {
                   const share = Math.round((item.count / totalChannel) * 100)
                   return (
                     <div className="source-item" key={item.channel}>
-                      <div className="source-item-top">
-                        <ChannelIcon channel={item.channel} size={22} />
-                        <span className="source-name">{CHANNEL_LABEL[item.channel]}</span>
-                        <span className="source-count">{item.count}</span>
-                      </div>
+                      <ChannelIcon channel={item.channel} size={20} />
+                      <span className="source-name">{CHANNEL_LABEL[item.channel]}</span>
+                      <span className="source-count">{item.count}</span>
                       <span className="source-meter">
-                        <span style={{ width: `${Math.max(share, 3)}%`, background: CHANNEL_COLOR[item.channel] }} />
+                        <span
+                          style={{
+                            width: `${Math.min(Math.max(share, 4), 100)}%`,
+                            background: CHANNEL_COLOR[item.channel],
+                          }}
+                        />
                       </span>
-                      <span className="source-hint">{share}% обращений</span>
+                      <span className="source-hint">{share}%</span>
                     </div>
                   )
                 })}

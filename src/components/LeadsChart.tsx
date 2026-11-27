@@ -4,7 +4,7 @@ import { formatShortDate } from '../lib/format'
 const LAYERS: { key: keyof Omit<SeriesPoint, 'date'>; color: string; label: string }[] = [
   { key: 'whatsapp', color: '#25d366', label: 'WhatsApp' },
   { key: 'instagram', color: '#dd2a7b', label: 'Instagram' },
-  { key: 'site', color: '#64748b', label: 'Сайт' },
+  { key: 'site', color: '#0f8aa8', label: 'Сайт' },
   { key: 'phone', color: '#e5a63c', label: 'Телефон' },
 ]
 

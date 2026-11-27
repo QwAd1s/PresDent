@@ -28,7 +28,7 @@ export function InstagramGlyph({ size = 12 }: { size?: number }) {
 
 export function ChannelIcon({ channel, size = 22 }: { channel: Channel; size?: number }) {
   return (
-    <span className={`channel-icon ${channel}`} style={{ width: size, height: size }}>
+    <span className={`channel-icon ch-${channel}`} style={{ width: size, height: size }}>
       {channel === 'whatsapp' && <WhatsAppGlyph size={size * 0.62} />}
       {channel === 'instagram' && <InstagramGlyph size={size * 0.58} />}
       {channel === 'site' && <Icon name="globe" size={size * 0.56} />}
